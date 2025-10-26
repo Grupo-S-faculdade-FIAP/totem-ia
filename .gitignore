@@ -1,0 +1,95 @@
+# Arquivo .gitignore para o projeto
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+recycling_totem.db
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Models (heavy files)
+*.h5
+*.hdf5
+*.pkl
+*.pth
+*.onnx
+models/*.bin
+models/*.pt
+
+# Images (if storing test images)
+*.jpg
+*.jpeg
+*.png
+*.gif
+test_images/
+
+# OS
+Thumbs.db
+desktop.ini
+
+# MicroPython
+*.mpy
+
+# Documentation builds
+docs/_build/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
