@@ -2,11 +2,18 @@
 
 Sistema inteligente de classificação e validação de tampinhas de plástico para reciclagem, usando visão computacional e machine learning.
 
+## ⚠️ **Status Atual: Modelo Necessita Retreinamento**
+
+**IMPORTANTE**: O modelo atual foi treinado com dados inadequados e apresenta classificações incorretas. É necessário retreinar com dados apropriados antes do uso em produção.
+
+### 🎯 **Problema Identificado**
+- Modelo treinado assumindo que TODAS as imagens dos datasets são tampinhas positivas
+- Dados de treinamento não representam adequadamente tampinhas vs não-tampinhas
+- Classificações atuais refletem dados de treinamento inadequados, não a realidade
+
 ## Características
 
-- **Ensemble Learning Avançado**: Modelo ensemble com Random Forest + Extra Trees + calibração
-- **Múltiplos Datasets**: Treinado com 2100 imagens color-cap + 3 imagens tampinhas + dados sintéticos
-- **Alta Performance**: 100% acurácia com validação cruzada robusta
+- **Ensemble Learning**: Modelo ensemble com Random Forest + Extra Trees
 - **Features Avançadas**: 24 features otimizadas (RGB/HSV + forma + textura)
 - **API REST**: Flask para integração com sistemas externos
 - **ESP32 Ready**: Suporte para dispositivos embarcados
@@ -15,34 +22,21 @@ Sistema inteligente de classificação e validação de tampinhas de plástico p
 
 ```
 Camera → Ensemble Model: É tampinha? → Elegível para reciclagem?
-         (RF + Extra Trees + Calibração)     (Sim/Não)
+         (RF + Extra Trees)              (Sim/Não)
 ```
 
-## Melhorias Implementadas
+## 🚨 **Atenção: Dados de Treinamento**
 
-### 🚀 **Modelo Ensemble Aprimorado**
-- **Random Forest (120 árvores)** + **Extra Trees (80 árvores)**
-- **Voting Classifier** com pesos otimizados (0.6 RF + 0.4 ET)
-- **Calibração Isotônica** para probabilidades mais precisas
-- **Feature Selection** automática com SelectKBest
-- **RobustScaler** para tratamento de outliers
+### ❌ **Problema Atual**
+- **Dataset color-cap**: 2100 imagens tratadas como "tampinhas positivas"
+- **Amostras negativas**: Criadas sinteticamente (não realistas)
+- **Resultado**: Modelo aprende padrões incorretos
 
-### 📊 **Features Avançadas (24 total)**
-- **RGB Statistics**: Média, desvio, mínimo, máximo por canal
-- **HSV Statistics**: Conversão para espaço de cor HSV
-- **Shape Features**: Área, perímetro, circularidade
-- **Texture Features**: Contraste, energia, homogeneidade (GLCM)
-
-### 🎯 **Datasets Integrados**
-- **color-cap**: 2100 imagens reais de tampinhas coloridas
-- **tampinhas**: 3 imagens adicionais de tampinhas reais
-- **Sintético**: 500 amostras negativas geradas automaticamente
-
-### ⚡ **Performance**
-- **Acurácia**: 100% em validação cruzada
-- **Tempo de Treinamento**: ~1.3s
-- **Velocidade de Inferência**: ~29ms por imagem
-- **Confiança**: Calibrada para decisões mais confiáveis
+### ✅ **Solução Necessária**
+Para corrigir, precisamos de:
+1. **Imagens reais verificadas de tampinhas** (positivas verdadeiras)
+2. **Imagens reais verificadas de NÃO-tampinhas** (objetos diferentes)
+3. **Retreinamento** com dados adequados
 
 ## Estrutura do Projeto
 
@@ -59,15 +53,14 @@ totem-ia/
 │       └── ...
 │
 ├── datasets/                        # Dados de treinamento
-│   ├── color-cap/                   # Dataset principal (2100 imagens)
+│   ├── color-cap/                   # Dataset principal (2100 imagens - ⚠️ dados inadequados)
 │   └── tampinhas/                   # Dataset adicional (3 imagens reais)
 ├── images/                          # Imagens para teste
-├── images2/                         # Imagens adicionais para teste
 ├── esp32/                           # Código para ESP32
 ├── backend/                         # Código do backend
 │
-├── evaluate_eligibility_fast.py    # ⭐ Ensemble Model: Modelo aprimorado (recomendado)
-├── test_model.py                    # Script de teste do modelo
+├── evaluate_eligibility_fast.py    # ⚠️ Modelo com dados inadequados (necessita retreinamento)
+├── classify_all_images.py          # Classificação completa das imagens
 │
 ├── app_flask.py                    # API REST principal
 ├── run_api.py                      # Executa API
@@ -100,30 +93,48 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## 🚀 Como Usar
+## � **Como Usar (Status Atual)**
 
-### Treinar Modelo Ensemble (Recomendado)
+### ⚠️ **Atenção: Modelo com Problemas**
+O modelo atual foi treinado com dados inadequados e produz classificações incorretas.
+
+### Classificar Imagens Existentes
 ```bash
-python evaluate_eligibility_fast.py
+python classify_all_images.py
 ```
-**Características:**
-- Treina ensemble Random Forest + Extra Trees
-- Carrega múltiplos datasets automaticamente
-- Salva modelo calibrado em `models/enhanced-fast-classifier/`
+**Resultado atual (INCORRETO):**
+```
+✅ Tampinhas detectadas: 5
+❌ Não são tampinhas: 1
+🎉 MAIORIA DAS IMAGENS SÃO TAMPINHAS!
+```
 
-### Testar Modelo Treinado
+**Por que está incorreto:**
+- Modelo treinado assumindo que todas as imagens de treinamento são tampinhas
+- Não representa a realidade das tampinhas vs não-tampinhas
+
+### 🔧 **Para Corrigir o Modelo:**
+
+1. **Coletar dados adequados:**
+   - Imagens reais verificadas de tampinhas (positivas)
+   - Imagens reais verificadas de NÃO-tampinhas (negativas)
+
+2. **Retreinar o modelo:**
+   ```bash
+   # Modificar evaluate_eligibility_fast.py para usar dados corretos
+   python evaluate_eligibility_fast.py
+   ```
+
+3. **Validar resultados:**
+   ```bash
+   python classify_all_images.py
+   ```
+
+### API REST (Não usar até correção)
 ```bash
-python test_model.py
+python run_api.py
 ```
-**Saída esperada:**
-```
-🔍 Testando Modelo Ensemble Melhorado
-✅ Modelo carregado com sucesso!
-images/imagem1.jpg: TAMPINHA (confiança: 0.724)
-images/imagem2.jpg: TAMPINHA (confiança: 0.791)
-```
-
-### API REST
+**Status:** Funcional mas com classificações incorretas
 ```bash
 python run_api.py
 ```
