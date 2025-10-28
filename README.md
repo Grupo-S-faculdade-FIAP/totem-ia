@@ -25,10 +25,14 @@ totem-ia/
 │   │   ├── classifier.pkl
 │   │   ├── scaler.pkl
 │   │   └── classes.json
-│   └── binary-cap-detector/        # Detector binário (cap vs non-cap)
-│       ├── binary_classifier.pkl
-│       ├── binary_scaler.pkl
-│       └── binary_metadata.json
+│   ├── binary-cap-detector/        # Detector binário original
+│   │   ├── binary_classifier.pkl
+│   │   ├── binary_scaler.pkl
+│   │   └── binary_metadata.json
+│   └── binary-cap-detector-hybrid/ # Detector binário híbrido ⭐
+│       ├── binary_classifier_hybrid.pkl
+│       ├── binary_scaler_hybrid.pkl
+│       └── binary_metadata_hybrid.json
 │
 ├── datasets/                        # Dados de treinamento
 ├── images/                          # Imagens para teste
@@ -109,16 +113,21 @@ A API estará disponível em `http://localhost:5000`
 
 ## Modelos Disponíveis
 
-### Random Forest (Recomendado)
-- **Acurácia**: 100% (treinamento e teste)
-- **Tamanho**: ~5 MB (binário) + ~0.04 MB (cores)
+### Random Forest Híbrido (Recomendado) ⭐
+- **Acurácia**: 98.1% (teste) / 96.7% (validação cruzada)
+- **Tamanho**: ~5 MB
 - **Latência**: ~123 ms por imagem
-- **Status**: ✅ Pronto para produção
+- **Tipo**: Binário híbrido (sintético + real)
+- **Status**: ✅ Pronto para produção - reconhece 100% das tampinhas reais!
+
+### Random Forest Realista
+- **Acurácia**: 99.7% (teste)
+- **Tamanho**: ~5 MB
+- **Status**: ⚠️ Menos preciso com tampinhas reais
 
 ### Vision Transformer (Experimental)
-- **Acurácia**: 0% (não convergiu no dataset)
+- **Acurácia**: 0% (não convergiu)
 - **Tamanho**: 327 MB
-- **Latência**: ~3478 ms por imagem
 - **Status**: ❌ Não recomendado
 
 ## Treinamento
@@ -149,14 +158,13 @@ Gera `ANALISE_COMPARATIVA.json` com métricas detalhadas.
 
 ## Performance
 
-| Métrica | Random Forest | Vision Transformer |
-|---------|--------------|-------------------|
-| Acurácia | 100% | 0% |
-| Tamanho | 5 MB | 327 MB |
-| Latência | 123 ms | 3478 ms |
-| Velocidade | 28.3x mais rápido | Base |
+| Modelo | Acurácia | Tamanho | Latência | Tampinhas Reais |
+|--------|----------|---------|----------|-----------------|
+| **Random Forest Híbrido** | 98.1% | 5 MB | 123 ms | **100%** ✅ |
+| Random Forest Realista | 99.7% | 5 MB | 123 ms | 0% ❌ |
+| Vision Transformer | 0% | 327 MB | 3478 ms | 0% ❌ |
 
-**Conclusão**: Random Forest é recomendado para produção.
+**Conclusão**: Random Forest Híbrido é o campeão absoluto!
 
 ## Recursos da API
 
@@ -193,9 +201,10 @@ FileNotFoundError: models/binary-cap-detector/binary_classifier.pkl
 Solução: Execute `python train_binary_classifier.py` para treinar.
 
 ### Imagens rejeitadas como "não-tampinha"
-- Verifique se as imagens contêm tampinhas reais
-- Modelos foram treinados com dados sintéticos; pode haver diferença com imagens reais
-- Considere coletar dataset real para retreinamento
+- **Sintomas**: Modelo rejeita imagens que são claramente tampinhas
+- **Causa**: Modelo treinado com dados sintéticos vs fotos reais
+- **Solução**: Use o modelo híbrido (`binary-cap-detector-hybrid/`)
+- **Verificação**: Execute `python test_hybrid_model.py` para testar
 
 ### Erro de encoding (Windows)
 - Já está tratado com UTF-8

@@ -1,0 +1,18 @@
+{
+  "model_type": "RandomForestClassifier",
+  "n_estimators": 100,
+  "max_depth": 20,
+  "training_date": "2025-10-28T13:22:44.564909",
+  "training_samples": 700,
+  "test_samples": 300,
+  "features": 36,
+  "classes": [
+    "nao_tampinha",
+    "tampinha"
+  ],
+  "accuracy_train": 1.0,
+  "accuracy_test": 0.9966666666666667,
+  "cv_mean": 0.9985714285714286,
+  "cv_std": 0.0028571428571428467,
+  "data_type": "realistic_synthetic"
+}

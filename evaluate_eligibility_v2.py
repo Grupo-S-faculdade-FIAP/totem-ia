@@ -44,13 +44,13 @@ class CapClassifierV2:
         """Carrega os dois modelos"""
         logger.info("Carregando modelos...")
         
-        # Carrega modelo binário
+        # Carrega modelo binário HÍBRIDO (mais preciso com fotos reais)
         try:
-            with open("models/binary-cap-detector/binary_classifier.pkl", 'rb') as f:
+            with open("models/binary-cap-detector-hybrid/binary_classifier_hybrid.pkl", 'rb') as f:
                 self.binary_classifier = pickle.load(f)
-            with open("models/binary-cap-detector/binary_scaler.pkl", 'rb') as f:
+            with open("models/binary-cap-detector-hybrid/binary_scaler_hybrid.pkl", 'rb') as f:
                 self.binary_scaler = pickle.load(f)
-            logger.info("OK - Modelo binário carregado")
+            logger.info("OK - Modelo binário HÍBRIDO carregado")
         except FileNotFoundError as e:
             logger.error(f"Erro ao carregar modelo binário: {e}")
             raise
