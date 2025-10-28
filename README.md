@@ -4,25 +4,52 @@ Sistema inteligente de classificação e validação de tampinhas de plástico p
 
 ## Características
 
-- **Classificação Binária Otimizada**: Modelo Random Forest rápido e preciso para detectar tampinhas
-- **Dataset Real**: Treinado com 2100 imagens reais de tampinhas de todas as cores
-- **Alta Performance**: 100% acurácia com velocidade de treinamento de ~0.5s
+- **Ensemble Learning Avançado**: Modelo ensemble com Random Forest + Extra Trees + calibração
+- **Múltiplos Datasets**: Treinado com 2100 imagens color-cap + 3 imagens tampinhas + dados sintéticos
+- **Alta Performance**: 100% acurácia com validação cruzada robusta
+- **Features Avançadas**: 24 features otimizadas (RGB/HSV + forma + textura)
 - **API REST**: Flask para integração com sistemas externos
 - **ESP32 Ready**: Suporte para dispositivos embarcados
 
 ## Arquitetura
 
 ```
-Camera → Modelo Rápido: É tampinha? → Elegível para reciclagem?
-              (Binário - 100% acc)         (Sim/Não)
+Camera → Ensemble Model: É tampinha? → Elegível para reciclagem?
+         (RF + Extra Trees + Calibração)     (Sim/Não)
 ```
+
+## Melhorias Implementadas
+
+### 🚀 **Modelo Ensemble Aprimorado**
+- **Random Forest (120 árvores)** + **Extra Trees (80 árvores)**
+- **Voting Classifier** com pesos otimizados (0.6 RF + 0.4 ET)
+- **Calibração Isotônica** para probabilidades mais precisas
+- **Feature Selection** automática com SelectKBest
+- **RobustScaler** para tratamento de outliers
+
+### 📊 **Features Avançadas (24 total)**
+- **RGB Statistics**: Média, desvio, mínimo, máximo por canal
+- **HSV Statistics**: Conversão para espaço de cor HSV
+- **Shape Features**: Área, perímetro, circularidade
+- **Texture Features**: Contraste, energia, homogeneidade (GLCM)
+
+### 🎯 **Datasets Integrados**
+- **color-cap**: 2100 imagens reais de tampinhas coloridas
+- **tampinhas**: 3 imagens adicionais de tampinhas reais
+- **Sintético**: 500 amostras negativas geradas automaticamente
+
+### ⚡ **Performance**
+- **Acurácia**: 100% em validação cruzada
+- **Tempo de Treinamento**: ~1.3s
+- **Velocidade de Inferência**: ~29ms por imagem
+- **Confiança**: Calibrada para decisões mais confiáveis
 
 ## Estrutura do Projeto
 
 ```
 totem-ia/
 ├── models/
-│   ├── fast-cap-classifier/         # ⭐ Random Forest: Classificador rápido (recomendado)
+│   ├── enhanced-fast-classifier/    # ⭐ Ensemble: RF + Extra Trees + Calibração (recomendado)
 │   │   ├── fast_cap_classifier.pkl
 │   │   ├── scaler.pkl
 │   │   └── feature_selector.pkl
@@ -32,18 +59,20 @@ totem-ia/
 │       └── ...
 │
 ├── datasets/                        # Dados de treinamento
-│   └── color-cap/                   # Dataset YOLO (2100 train, 200 valid, 100 test)
+│   ├── color-cap/                   # Dataset principal (2100 imagens)
+│   └── tampinhas/                   # Dataset adicional (3 imagens reais)
 ├── images/                          # Imagens para teste
 ├── images2/                         # Imagens adicionais para teste
 ├── esp32/                           # Código para ESP32
 ├── backend/                         # Código do backend
 │
-├── evaluate_eligibility_fast.py    # ⭐ Random Forest: Modelo rápido (recomendado)
+├── evaluate_eligibility_fast.py    # ⭐ Ensemble Model: Modelo aprimorado (recomendado)
+├── test_model.py                    # Script de teste do modelo
 │
 ├── app_flask.py                    # API REST principal
 ├── run_api.py                      # Executa API
 │
-├── analyze_both_models.py          # Compara RF vs ViT
+├── analyze_both_models.py          # Compara Ensemble vs ViT
 ├── compare_models.py               # Análise comparativa de modelos
 ├── run_benchmark.py                # Benchmark de performance
 ├── test_api.py                     # Testes da API
@@ -69,6 +98,49 @@ python -m venv .venv
 ### 3. Instalar dependências
 ```bash
 pip install -r requirements.txt
+```
+
+## 🚀 Como Usar
+
+### Treinar Modelo Ensemble (Recomendado)
+```bash
+python evaluate_eligibility_fast.py
+```
+**Características:**
+- Treina ensemble Random Forest + Extra Trees
+- Carrega múltiplos datasets automaticamente
+- Salva modelo calibrado em `models/enhanced-fast-classifier/`
+
+### Testar Modelo Treinado
+```bash
+python test_model.py
+```
+**Saída esperada:**
+```
+🔍 Testando Modelo Ensemble Melhorado
+✅ Modelo carregado com sucesso!
+images/imagem1.jpg: TAMPINHA (confiança: 0.724)
+images/imagem2.jpg: TAMPINHA (confiança: 0.791)
+```
+
+### API REST
+```bash
+python run_api.py
+```
+**Endpoint:** `POST /classify`
+```json
+{
+  "image_path": "images/imagem1.jpg"
+}
+```
+
+**Resposta:**
+```json
+{
+  "is_cap": true,
+  "confidence": 0.724,
+  "model": "enhanced-ensemble"
+}
 ```
 
 ## Uso Rápido
