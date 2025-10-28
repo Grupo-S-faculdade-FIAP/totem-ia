@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTEM IA - Deposito Inteligente de Tampinhas</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .totem-container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* HEADER */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* MAIN CONTENT */
+        .content {
+            padding: 30px;
+        }
+
+        /* CAMERA SECTION */
+        .camera-section {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .camera-label {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+            display: block;
+            font-weight: 600;
+        }
+
+        #videoContainer {
+            position: relative;
+            width: 100%;
+            background: #f0f0f0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            aspect-ratio: 16 / 9;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        #canvasContainer {
+            display: none;
+            position: relative;
+            width: 100%;
+            background: #f0f0f0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            aspect-ratio: 16 / 9;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* BUTTON */
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-deposit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            flex: 1;
+            min-width: 200px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-deposit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .btn-deposit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-reset {
+            background: #e0e0e0;
+            color: #333;
+            min-width: 100px;
+        }
+
+        .btn-reset:hover {
+            background: #d0d0d0;
+        }
+
+        /* LOADING STATE */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* RESULT SECTION */
+        .result-section {
+            display: none;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .result-section.success {
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.05));
+            border: 2px solid #4CAF50;
+        }
+
+        .result-section.error {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.1), rgba(244, 67, 54, 0.05));
+            border: 2px solid #f44336;
+        }
+
+        /* LED LIGHTS */
+        .led-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .led {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .led.off {
+            background: #f0f0f0;
+            color: #999;
+        }
+
+        .led.green {
+            background: #4CAF50;
+            color: white;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        .led.red {
+            background: #f44336;
+            color: white;
+            box-shadow: 0 0 20px rgba(244, 67, 54, 0.8);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* RESULT TEXT */
+        .result-icon {
+            font-size: 60px;
+            margin-bottom: 15px;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+
+        .result-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .result-section.success .result-title {
+            color: #4CAF50;
+        }
+
+        .result-section.error .result-title {
+            color: #f44336;
+        }
+
+        .result-message {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        /* DETAILS */
+        .details {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            text-align: left;
+            border-left: 4px solid #667eea;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .detail-value {
+            color: #333;
+        }
+
+        /* FOOTER */
+        .footer {
+            background: #f5f5f5;
+            padding: 15px;
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            border-top: 1px solid #eee;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .header p {
+                font-size: 12px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            button {
+                padding: 12px 20px;
+                font-size: 14px;
+            }
+
+            .led {
+                width: 50px;
+                height: 50px;
+                font-size: 24px;
+            }
+
+            .result-icon {
+                font-size: 48px;
+            }
+
+            .result-title {
+                font-size: 22px;
+            }
+        }
+
+        /* ERROR ALERT */
+        .error-alert {
+            background: #ffebee;
+            border: 1px solid #ef5350;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .error-alert.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="totem-container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>
+                <i class="fas fa-recycle"></i>
+                TOTEM IA
+            </h1>
+            <p>Sistema Inteligente de Deposito de Tampinhas</p>
+        </div>
+
+        <!-- MAIN CONTENT -->
+        <div class="content">
+            <!-- ERROR ALERT -->
+            <div class="error-alert" id="errorAlert">
+                <i class="fas fa-exclamation-circle"></i>
+                <span id="errorMessage"></span>
+            </div>
+
+            <!-- CAMERA SECTION -->
+            <div class="camera-section" id="cameraSection">
+                <label class="camera-label">
+                    <i class="fas fa-camera"></i>
+                    Câmera do Totem
+                </label>
+                <div id="videoContainer">
+                    <video id="video" autoplay playsinline></video>
+                </div>
+                <div id="canvasContainer">
+                    <canvas id="canvas"></canvas>
+                </div>
+
+                <!-- BUTTONS -->
+                <div class="button-group">
+                    <button class="btn-deposit" id="captureBtn">
+                        <i class="fas fa-check-circle"></i>
+                        Deposite as Tampinhas
+                    </button>
+                    <button class="btn-reset" id="resetBtn">
+                        <i class="fas fa-redo"></i>
+                        Novo
+                    </button>
+                </div>
+            </div>
+
+            <!-- LOADING STATE -->
+            <div class="loading" id="loadingSection">
+                <div class="spinner"></div>
+                <div class="loading-text">
+                    <i class="fas fa-hourglass-half"></i>
+                    Analisando Tampinhas...
+                </div>
+            </div>
+
+            <!-- RESULT SECTION - SUCCESS -->
+            <div class="result-section" id="resultSuccess">
+                <div class="led-container">
+                    <div class="led green">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+                <div class="result-icon">
+                    <i class="fas fa-check-circle" style="color: #4CAF50;"></i>
+                </div>
+                <div class="result-title">Tampinha Aceita!</div>
+                <div class="result-message">
+                    <strong>Sucesso!</strong> A tampinha foi reconhecida e aceita.
+                    <br><br>
+                    Deposite na esteira de reciclagem.
+                </div>
+                <div class="details" id="detailsSuccess"></div>
+                <button class="btn-reset" id="resetBtnSuccess" style="width: 100%; margin-top: 15px;">
+                    <i class="fas fa-redo"></i>
+                    Fazer Novo Deposito
+                </button>
+            </div>
+
+            <!-- RESULT SECTION - ERROR -->
+            <div class="result-section error" id="resultError">
+                <div class="led-container">
+                    <div class="led red">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                </div>
+                <div class="result-icon">
+                    <i class="fas fa-times-circle" style="color: #f44336;"></i>
+                </div>
+                <div class="result-title">Item Rejeitado</div>
+                <div class="result-message">
+                    <strong>Atenção!</strong> O item detectado não é uma tampinha ou não foi reconhecido corretamente.
+                    <br><br>
+                    Por favor, deposite <strong>apenas tampinhas</strong> neste totem.
+                </div>
+                <div class="details" id="detailsError"></div>
+                <button class="btn-reset" id="resetBtnError" style="width: 100%; margin-top: 15px;">
+                    <i class="fas fa-redo"></i>
+                    Tentar Novamente
+                </button>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <i class="fas fa-info-circle"></i>
+            Posicione a câmera apontada para as tampinhas e clique em "Deposite as Tampinhas"
+        </div>
+    </div>
+
+    <script>
+        // ========================================================================
+        // VARIÁVEIS GLOBAIS
+        // ========================================================================
+
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const cameraSection = document.getElementById('cameraSection');
+        const loadingSection = document.getElementById('loadingSection');
+        const resultSuccess = document.getElementById('resultSuccess');
+        const resultError = document.getElementById('resultError');
+        const errorAlert = document.getElementById('errorAlert');
+        const errorMessage = document.getElementById('errorMessage');
+
+        const captureBtn = document.getElementById('captureBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const resetBtnSuccess = document.getElementById('resetBtnSuccess');
+        const resetBtnError = document.getElementById('resetBtnError');
+
+        // ========================================================================
+        // INICIALIZAÇÃO DA CÂMERA
+        // ========================================================================
+
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                video.srcObject = stream;
+                video.play();
+                console.log('✅ Câmera inicializada');
+            } catch (error) {
+                console.error('❌ Erro ao acessar câmera:', error);
+                showError('Não foi possível acessar a câmera. Verifique as permissões.');
+                captureBtn.disabled = true;
+            }
+        }
+
+        // ========================================================================
+        // CAPTURA E PROCESSAMENTO
+        // ========================================================================
+
+        function captureFrame() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            return canvas.toDataURL('image/jpeg', 0.95);
+        }
+
+        async function classifyImage(imageData) {
+            try {
+                const response = await fetch('/api/classify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        image: imageData
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP: ${response.status}`);
+                }
+
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error('Erro na requisição:', error);
+                throw error;
+            }
+        }
+
+        // ========================================================================
+        // MANIPULADORES DE EVENTOS
+        // ========================================================================
+
+        captureBtn.addEventListener('click', async () => {
+            captureBtn.disabled = true;
+            resetBtn.disabled = true;
+
+            // Mostrar loading
+            cameraSection.style.display = 'none';
+            loadingSection.style.display = 'block';
+            resultSuccess.style.display = 'none';
+            resultError.style.display = 'none';
+            errorAlert.classList.remove('show');
+
+            try {
+                // Capturar frame
+                const imageData = captureFrame();
+
+                // Classificar
+                const result = await classifyImage(imageData);
+
+                // Simular som
+                playSound(result.is_tampinha ? 'success' : 'error');
+
+                // Mostrar resultado
+                if (result.is_tampinha) {
+                    showSuccess(result);
+                } else {
+                    showError(result);
+                }
+            } catch (error) {
+                showError('Erro ao processar imagem. Tente novamente.');
+            }
+
+            captureBtn.disabled = false;
+            resetBtn.disabled = false;
+        });
+
+        resetBtn.addEventListener('click', reset);
+        resetBtnSuccess.addEventListener('click', reset);
+        resetBtnError.addEventListener('click', reset);
+
+        function reset() {
+            cameraSection.style.display = 'block';
+            loadingSection.style.display = 'none';
+            resultSuccess.style.display = 'none';
+            resultError.style.display = 'none';
+            errorAlert.classList.remove('show');
+            video.play();
+        }
+
+        // ========================================================================
+        // EXIBIÇÃO DE RESULTADOS
+        // ========================================================================
+
+        function showSuccess(result) {
+            cameraSection.style.display = 'none';
+            loadingSection.style.display = 'none';
+            resultSuccess.style.display = 'block';
+
+            const details = `
+                <div class="detail-item">
+                    <span class="detail-label">Status:</span>
+                    <span class="detail-value" style="color: #4CAF50;">✓ Aceita</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Confiança:</span>
+                    <span class="detail-value">${(result.confidence * 100).toFixed(0)}%</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Saturação:</span>
+                    <span class="detail-value">${result.saturation.toFixed(1)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Método:</span>
+                    <span class="detail-value">${result.method}</span>
+                </div>
+            `;
+
+            document.getElementById('detailsSuccess').innerHTML = details;
+        }
+
+        function showError(result) {
+            cameraSection.style.display = 'none';
+            loadingSection.style.display = 'none';
+            resultError.style.display = 'block';
+
+            const details = `
+                <div class="detail-item">
+                    <span class="detail-label">Status:</span>
+                    <span class="detail-value" style="color: #f44336;">✗ Rejeitado</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Confiança:</span>
+                    <span class="detail-value">${(result.confidence * 100).toFixed(0)}%</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Saturação:</span>
+                    <span class="detail-value">${result.saturation.toFixed(1)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Motivo:</span>
+                    <span class="detail-value">${result.method}</span>
+                </div>
+            `;
+
+            document.getElementById('detailsError').innerHTML = details;
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorAlert.classList.add('show');
+        }
+
+        // ========================================================================
+        // SONS
+        // ========================================================================
+
+        function playSound(type) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            if (type === 'success') {
+                // Beep duplo para sucesso
+                const now = audioContext.currentTime;
+                const osc1 = audioContext.createOscillator();
+                const osc2 = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(audioContext.destination);
+
+                osc1.frequency.value = 800;
+                osc2.frequency.value = 1000;
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+                osc1.start(now);
+                osc2.start(now + 0.1);
+                osc1.stop(now + 0.1);
+                osc2.stop(now + 0.2);
+            } else {
+                // Beep único para erro
+                const now = audioContext.currentTime;
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+
+                osc.frequency.value = 400;
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        // ========================================================================
+        // INICIALIZAÇÃO
+        // ========================================================================
+
+        window.addEventListener('load', () => {
+            initCamera();
+        });
+
+        // Ajustar canvas ao redimensionar
+        window.addEventListener('resize', () => {
+            if (video.readyState === 4) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            }
+        });
+    </script>
+</body>
+</html>

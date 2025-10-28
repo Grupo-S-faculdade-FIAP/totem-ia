@@ -4,7 +4,7 @@ Random Forest Aprimorado - Classificação Binária Ultra Rápida
 Sistema de Classificação de Tampinhas: É TAMPINHA? SIM ou NÃO
 
 Dataset: 2100 imagens color-cap + 3 imagens tampinhas + dados sintéticos
-Features: 24 features otimizadas + ensemble learning
+Features: 27 features otimizadas + ensemble learning
 Modelo: Random Forest + Extra Trees ensemble
 """
 
@@ -31,12 +31,12 @@ class EnhancedFastClassifier:
     def __init__(self):
         self.model = None
         self.scaler = StandardScaler()
-        self.feature_selector = SelectKBest(score_func=f_classif, k=20)
+        self.feature_selector = SelectKBest(score_func=f_classif, k=22)
         self.model_path = Path("models/enhanced-fast-classifier")
         self.model_path.mkdir(parents=True, exist_ok=True)
 
     def extract_fast_features(self, image_path):
-        """Extrai 24 features otimizadas para velocidade"""
+        """Extrai 27 features otimizadas para velocidade e precisão"""
         try:
             image = cv2.imread(str(image_path))
             if image is None:
@@ -63,7 +63,7 @@ class EnhancedFastClassifier:
                     np.median(channel)
                 ])
 
-            # Forma básica (3 features)
+            # Forma melhorada para tampinhas (6 features adicionais)
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if contours:
@@ -71,9 +71,29 @@ class EnhancedFastClassifier:
                 area = cv2.contourArea(largest_contour)
                 perimeter = cv2.arcLength(largest_contour, True)
                 circularity = 4 * np.pi * area / (perimeter * perimeter) if perimeter > 0 else 0
-                features.extend([area/10000, perimeter/1000, circularity])
+
+                # Razão de aspecto (quão circular é)
+                x, y, w, h = cv2.boundingRect(largest_contour)
+                aspect_ratio = min(w, h) / max(w, h) if max(w, h) > 0 else 0
+
+                # Compacidade (medida de quão "compacto" é o objeto)
+                compactness = (perimeter * perimeter) / area if area > 0 else 0
+
+                # Solidez (área do contorno / área convexa)
+                hull = cv2.convexHull(largest_contour)
+                hull_area = cv2.contourArea(hull)
+                solidity = area / hull_area if hull_area > 0 else 0
+
+                # Extensão (área do objeto / área do bounding box)
+                rect_area = w * h
+                extent = area / rect_area if rect_area > 0 else 0
+
+                features.extend([
+                    area/10000, perimeter/1000, circularity,
+                    aspect_ratio, compactness/10000, solidity
+                ])
             else:
-                features.extend([0, 0, 0])
+                features.extend([0, 0, 0, 0, 0, 0])
 
             # Contraste básico (3 features)
             features.extend([
@@ -88,6 +108,43 @@ class EnhancedFastClassifier:
             logger.warning(f"Erro ao extrair features de {image_path}: {e}")
             return None
 
+    def create_synthetic_variations(self, base_features, target_count=500):
+        """Cria variações sintéticas mais realistas dos features"""
+        if len(base_features) == 0:
+            return []
+
+        synthetic_features = []
+        np.random.seed(42)  # Para reprodutibilidade
+
+        while len(synthetic_features) < target_count:
+            # Escolher uma feature base aleatoriamente
+            base = np.array(base_features[np.random.randint(len(base_features))])
+
+            # Criar variações mais realistas:
+            # 1. Ruído pequeno (5% da variância)
+            noise = np.random.normal(0, 0.05, size=len(base))
+
+            # 2. Variação de escala (simulando diferentes distâncias)
+            scale_factor = np.random.uniform(0.9, 1.1)
+            scaled = base * scale_factor
+
+            # 3. Variação de iluminação (afetando canais RGB/HSV)
+            brightness_factor = np.random.uniform(0.8, 1.2)
+            # Aplicar variação de brilho principalmente nos primeiros 9 features (RGB/HSV)
+            illumination_variation = np.ones_like(base)
+            illumination_variation[:9] = brightness_factor
+            illuminated = scaled * illumination_variation
+
+            # Combinar variações
+            synthetic = illuminated + noise
+
+            # Garantir que os valores estejam dentro de limites razoáveis
+            synthetic = np.clip(synthetic, 0, 255)  # Features de imagem típicos
+
+            synthetic_features.append(synthetic)
+
+        return synthetic_features[:target_count]
+
     def load_corrected_dataset(self):
         """Carrega dataset corrigido com labels adequadas"""
         logger.info("Carregando dataset corrigido para retreinamento...")
@@ -95,37 +152,49 @@ class EnhancedFastClassifier:
         all_features = []
         all_labels = []
 
-        # 1. POSITIVAS: Apenas tampinhas reais verificadas
+        # ESTRATÉGIA CORRIGIDA: Focar nas tampinhas reais verificadas
+        # 1. POSITIVAS: TODAS as tampinhas reais verificadas (só essas!)
         tampinhas_dir = Path("datasets/tampinhas")
         if tampinhas_dir.exists():
-            tampinhas_files = list(tampinhas_dir.glob("*.jpg"))
+            tampinhas_files = list(tampinhas_dir.glob("*"))
             logger.info(f"Encontradas {len(tampinhas_files)} tampinhas reais verificadas")
 
-            for img_path in tqdm(tampinhas_files, desc="Tampinhas positivas"):
+            for img_path in tqdm(tampinhas_files, desc="Tampinhas reais positivas"):
                 features = self.extract_fast_features(img_path)
                 if features is not None:
                     all_features.append(features)
-                    all_labels.append(1)  # Tampinha positiva verdadeira
+                    all_labels.append(1)  # TAMPINHA REAL
 
-        # 2. NEGATIVAS: Imagens que claramente não são tampinhas
-        # Estratégia: usar imagens variadas do color-cap como negativas
-        # (assumindo que nem todas são tampinhas reais)
-        negatives_dir = Path("datasets/color-cap/train/images")
-        if negatives_dir.exists():
-            negative_files = list(negatives_dir.glob("*.jpg"))
+            # Criar MILHARES de variações sintéticas das tampinhas reais
+            if len(all_features) > 0:
+                logger.info(f"Criando variações sintéticas das {len(all_features)} tampinhas reais...")
+                synthetic_positives = self.create_synthetic_variations(all_features, target_count=3000)
+                all_features.extend(synthetic_positives)
+                all_labels.extend([1] * len(synthetic_positives))
+                logger.info(f"Adicionadas {len(synthetic_positives)} variações sintéticas positivas")
 
-            # Pegar uma amostra representativa como negativas
-            # Usar apenas algumas para balancear com as positivas
-            num_negatives = min(len(all_labels), 100)  # Mesmo número que positivas ou máximo 100
-            selected_negatives = negative_files[:num_negatives]
+        # 2. NEGATIVAS: TODAS as imagens da pasta nao-tampinhas
+        nao_tampinhas_dir = Path("datasets/nao-tampinhas")
+        if nao_tampinhas_dir.exists():
+            nao_tampinhas_files = list(nao_tampinhas_dir.glob("*"))
+            logger.info(f"Encontradas {len(nao_tampinhas_files)} imagens negativas (não-tampinhas)")
 
-            logger.info(f"Selecionadas {len(selected_negatives)} imagens como negativas")
-
-            for img_path in tqdm(selected_negatives, desc="Negativas (não-tampinhas)"):
+            # Carregar as negativas originais
+            negative_features = []
+            for img_path in tqdm(nao_tampinhas_files, desc="Não-tampinhas originais"):
                 features = self.extract_fast_features(img_path)
                 if features is not None:
+                    negative_features.append(features)
                     all_features.append(features)
-                    all_labels.append(0)  # Não é tampinha
+                    all_labels.append(0)  # NÃO É TAMPINHA
+
+            # Criar variações sintéticas das negativas para balancear o dataset
+            if len(negative_features) > 0:
+                logger.info(f"Criando variações sintéticas das {len(negative_features)} negativas...")
+                synthetic_negatives = self.create_synthetic_variations(negative_features, target_count=2000)
+                all_features.extend(synthetic_negatives)
+                all_labels.extend([0] * len(synthetic_negatives))
+                logger.info(f"Adicionadas {len(synthetic_negatives)} variações sintéticas negativas")
 
         # 3. Aumentar dados com variações sintéticas das positivas
         if len(all_features) > 0:
@@ -196,38 +265,20 @@ class EnhancedFastClassifier:
         from sklearn.ensemble import VotingClassifier, ExtraTreesClassifier, RandomForestClassifier
         from sklearn.calibration import CalibratedClassifierCV
 
-        # Modelo base 1: Random Forest
+        # Estratégia mais simples: apenas Random Forest com menos regularização
         rf = RandomForestClassifier(
-            n_estimators=120,
-            max_depth=15,
-            min_samples_split=5,
-            min_samples_leaf=2,
+            n_estimators=50,  # Menos árvores
+            max_depth=None,   # Sem limite de profundidade
+            min_samples_split=2,
+            min_samples_leaf=1,
             max_features='sqrt',
             random_state=42,
             n_jobs=-1
         )
 
-        # Modelo base 2: Extra Trees
-        et = ExtraTreesClassifier(
-            n_estimators=80,
-            max_depth=12,
-            min_samples_split=4,
-            min_samples_leaf=2,
-            max_features='sqrt',
-            random_state=42,
-            n_jobs=-1
-        )
-
-        # Ensemble com voting
-        ensemble = VotingClassifier(
-            estimators=[('rf', rf), ('et', et)],
-            voting='soft',  # Usa probabilidades
-            weights=[0.6, 0.4]  # Peso maior para Random Forest
-        )
-
-        # Calibração para melhores probabilidades
+        # Usar apenas Random Forest (sem ensemble)
         self.model = CalibratedClassifierCV(
-            ensemble,
+            rf,
             method='isotonic',
             cv=3
         )

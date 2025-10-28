@@ -39,9 +39,9 @@ def main():
                     nao_tampinhas_count += 1
 
                 results.append((img_path.name, result, confidence))
-                print("30")
+                print(f"{img_path.name}: {result} (confiança: {confidence:.2f})")
             else:
-                print("30")
+                print(f"{img_path.name}: ❌ ARQUIVO NÃO ENCONTRADO")
 
         print()
         print("📊 RESULTADO FINAL:")
@@ -60,7 +60,7 @@ def main():
         print("\n📋 DETALHES POR IMAGEM:")
         print("-" * 40)
         for img_name, result, confidence in results:
-            print("30")
+            print(f"{img_name}: {result} (confiança: {confidence:.2f})")
 
     else:
         print('❌ Erro ao carregar modelo')
