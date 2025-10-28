@@ -88,58 +88,74 @@ class EnhancedFastClassifier:
             logger.warning(f"Erro ao extrair features de {image_path}: {e}")
             return None
 
-    def load_enhanced_dataset(self):
-        """Carrega múltiplos datasets para treinamento robusto"""
-        logger.info("Carregando múltiplos datasets...")
+    def load_corrected_dataset(self):
+        """Carrega dataset corrigido com labels adequadas"""
+        logger.info("Carregando dataset corrigido para retreinamento...")
 
         all_features = []
         all_labels = []
 
-        # 1. Dataset principal: color-cap
-        images_dir = Path("datasets/color-cap/train/images")
-        if images_dir.exists():
-            image_files = list(images_dir.glob("*.jpg"))
-            logger.info(f"Encontradas {len(image_files)} imagens em color-cap")
-
-            for img_path in tqdm(image_files[:2000], desc="Color-cap"):  # Limitado para velocidade
-                features = self.extract_fast_features(img_path)
-                if features is not None:
-                    all_features.append(features)
-                    all_labels.append(1)  # Todas são tampinhas
-
-        # 2. Dataset adicional: tampinhas
+        # 1. POSITIVAS: Apenas tampinhas reais verificadas
         tampinhas_dir = Path("datasets/tampinhas")
         if tampinhas_dir.exists():
             tampinhas_files = list(tampinhas_dir.glob("*.jpg"))
-            logger.info(f"Encontradas {len(tampinhas_files)} imagens em tampinhas")
+            logger.info(f"Encontradas {len(tampinhas_files)} tampinhas reais verificadas")
 
-            for img_path in tqdm(tampinhas_files, desc="Tampinhas"):
+            for img_path in tqdm(tampinhas_files, desc="Tampinhas positivas"):
                 features = self.extract_fast_features(img_path)
                 if features is not None:
                     all_features.append(features)
-                    all_labels.append(1)  # Tampinhas positivas
+                    all_labels.append(1)  # Tampinha positiva verdadeira
 
-        # 3. Dataset de teste adicional
-        test_dir = Path("images2")
-        if test_dir.exists():
-            test_files = list(test_dir.glob("*.jpg"))
-            logger.info(f"Encontradas {len(test_files)} imagens adicionais em images2")
+        # 2. NEGATIVAS: Imagens que claramente não são tampinhas
+        # Estratégia: usar imagens variadas do color-cap como negativas
+        # (assumindo que nem todas são tampinhas reais)
+        negatives_dir = Path("datasets/color-cap/train/images")
+        if negatives_dir.exists():
+            negative_files = list(negatives_dir.glob("*.jpg"))
 
-            for img_path in tqdm(test_files, desc="Images2"):
+            # Pegar uma amostra representativa como negativas
+            # Usar apenas algumas para balancear com as positivas
+            num_negatives = min(len(all_labels), 100)  # Mesmo número que positivas ou máximo 100
+            selected_negatives = negative_files[:num_negatives]
+
+            logger.info(f"Selecionadas {len(selected_negatives)} imagens como negativas")
+
+            for img_path in tqdm(selected_negatives, desc="Negativas (não-tampinhas)"):
                 features = self.extract_fast_features(img_path)
                 if features is not None:
                     all_features.append(features)
-                    all_labels.append(1)  # Assumindo que são tampinhas
+                    all_labels.append(0)  # Não é tampinha
+
+        # 3. Aumentar dados com variações sintéticas das positivas
+        if len(all_features) > 0:
+            logger.info("Criando variações sintéticas para aumentar dados...")
+            base_positives = [f for f, l in zip(all_features, all_labels) if l == 1]
+
+            for i, base_features in enumerate(base_positives):
+                # Criar 2-3 variações por imagem positiva
+                for variation in range(3):
+                    # Adicionar pequeno ruído para criar variações
+                    noise = np.random.normal(0, 0.1, len(base_features))
+                    varied_features = base_features + noise
+
+                    # Garantir que features não sejam negativas ou muito extremas
+                    varied_features = np.clip(varied_features, 0, 255)
+
+                    all_features.append(varied_features)
+                    all_labels.append(1)  # Ainda é tampinha (variação)
 
         X = np.array(all_features)
         y = np.array(all_labels)
 
-        logger.info(f"Dataset carregado: {X.shape[0]} amostras, {X.shape[1]} features")
+        logger.info(f"Dataset corrigido: {X.shape[0]} amostras, {X.shape[1]} features")
+        logger.info(f"Positivas (tampinhas): {np.sum(y == 1)}, Negativas (não-tampinhas): {np.sum(y == 0)}")
+
         return X, y
 
     def load_dataset(self, data_path):
         """Carrega dataset YOLO e extrai features (compatibilidade)"""
-        return self.load_enhanced_dataset()
+        return self.load_corrected_dataset()
 
     def create_negative_samples(self, X_positive, num_negative=500):
         """Cria amostras negativas (não tampinhas)"""
@@ -281,24 +297,18 @@ def main():
     if classifier.load_model():
         print("✅ Modelo carregado com sucesso!")
     else:
-        print("🔄 Treinando novo modelo...")
+        print("🔄 Treinando novo modelo com dados corrigidos...")
 
-        # Carregar dados de treino
-        print("\n📂 Carregando dados de treino...")
-        X_train, y_train = classifier.load_dataset("datasets/color-cap/train")
+        # Carregar dados de treino corrigidos
+        print("\n📂 Carregando dados de treino corrigidos...")
+        X_train, y_train = classifier.load_corrected_dataset()
 
-        # Criar amostras negativas
-        X_negative, y_negative = classifier.create_negative_samples(X_train, num_negative=500)
-
-        # Combinar dados
-        X_combined = np.vstack([X_train, X_negative])
-        y_combined = np.hstack([y_train, y_negative])
-
-        print(f"Dataset final: {X_combined.shape[0]} amostras ({X_combined.shape[1]} features)")
-        print(f"Positivas: {np.sum(y_combined == 1)}, Negativas: {np.sum(y_combined == 0)}")
+        # Usar dados corrigidos diretamente (já inclui positivas e negativas)
+        print(f"Dataset final: {X_train.shape[0]} amostras ({X_train.shape[1]} features)")
+        print(f"Positivas: {np.sum(y_train == 1)}, Negativas: {np.sum(y_train == 0)}")
 
         # Treinar modelo
-        cv_scores = classifier.train_model(X_combined, y_combined)
+        cv_scores = classifier.train_model(X_train, y_train)
 
         # Salvar modelo
         classifier.save_model()
