@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-10-27T21:51:01.311769",
+  "stats": {
+    "total_images": 10,
+    "eligible": 8,
+    "ineligible": 2,
+    "eligibility_rate": 0.8
+  },
+  "results": [
+    {
+      "eligible": 

@@ -1,0 +1,104 @@
+{
+  "timestamp": "2025-10-28T11:47:55.641335",
+  "total_images": 5,
+  "random_forest": {
+    "eligible_count": 4,
+    "total": 5,
+    "eligibility_rate": 80.0,
+    "avg_confidence": 1.0,
+    "min_confidence": 1.0,
+    "max_confidence": 1.0,
+    "processing_time_sec": 0.6154437065124512,
+    "speed_ms_per_image": 123.08874130249023,
+    "model_size_mb": 0.04,
+    "status": "RECOMENDADO PARA PRODUÇÃO"
+  },
+  "vision_transformer": {
+    "eligible_count": 0,
+    "total": 5,
+    "eligibility_rate": 0.0,
+    "avg_confidence": 0.11236751526594162,
+    "min_confidence": 0.09854736924171448,
+    "max_confidence": 0.13589021563529968,
+    "processing_time_sec": 17.390540599822998,
+    "speed_ms_per_image": 3478.1081199645996,
+    "model_size_mb": 327,
+    "status": "ALTERNATIVA / PESQUISA"
+  },
+  "detailed_results": {
+    "random_forest": [
+      {
+        "image": "imagem1.jpg",
+        "eligible": true,
+        "color": "Vermelho",
+        "confidence": 1.0,
+        "reason": "ELIGIBLE"
+      },
+      {
+        "image": "imagem2.jpg",
+        "eligible": true,
+        "color": "Vermelho",
+        "confidence": 1.0,
+        "reason": "ELIGIBLE"
+      },
+      {
+        "image": "imagem3.jpg",
+        "eligible": true,
+        "color": "Vermelho",
+        "confidence": 1.0,
+        "reason": "ELIGIBLE"
+      },
+      {
+        "image": "imagem4.jpg",
+        "eligible": true,
+        "color": "Vermelho",
+        "confidence": 1.0,
+        "reason": "ELIGIBLE"
+      },
+      {
+        "image": "imagem5.jpg",
+        "eligible": false,
+        "color": "DESCONHECIDO",
+        "confidence": 0.0,
+        "reason": "INVALID_IMAGE"
+      }
+    ],
+    "vision_transformer": [
+      {
+        "image": "imagem1.jpg",
+        "eligible": false,
+        "color": "Marrom",
+        "confidence": 0.1010952889919281,
+        "reason": "Confiança abaixo de 70%"
+      },
+      {
+        "image": "imagem2.jpg",
+        "eligible": false,
+        "color": "Marrom",
+        "confidence": 0.10015826672315598,
+        "reason": "Confiança abaixo de 70%"
+      },
+      {
+        "image": "imagem3.jpg",
+        "eligible": false,
+        "color": "Marrom",
+        "confidence": 0.09854736924171448,
+        "reason": "Confiança abaixo de 70%"
+      },
+      {
+        "image": "imagem4.jpg",
+        "eligible": false,
+        "color": "Marrom",
+        "confidence": 0.12614643573760986,
+        "reason": "Confiança abaixo de 70%"
+      },
+      {
+        "image": "imagem5.jpg",
+        "eligible": false,
+        "color": "Marrom",
+        "confidence": 0.13589021563529968,
+        "reason": "Confiança abaixo de 70%"
+      }
+    ]
+  }
+}
