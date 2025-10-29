@@ -176,27 +176,63 @@ def classify_image(image):
 @app.route('/')
 def index():
     """Página principal do totem"""
-    return render_template('totem.html')
+    return render_template('totem_v2.html')
+
+@app.route('/totem_v2.html')
+def totem_v2():
+    """Rota para acessar totem_v2.html diretamente"""
+    return render_template('totem_v2.html')
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
     """
     Endpoint para classificar imagem
     
-    Recebe: POST com imagem em base64
+    Recebe: POST com imagem em base64 ou multipart/form-data
     Retorna: JSON com classificação e detalhes
     """
     try:
-        data = request.get_json()
+        image = None
 
-        if not data or 'image' not in data:
-            return jsonify({'error': 'Nenhuma imagem fornecida'}), 400
+        # Verificar se é JSON com base64
+        if request.is_json:
+            data = request.get_json()
 
-        # Decodificar imagem base64
-        image_data = data['image'].split(',')[1] if ',' in data['image'] else data['image']
-        image_bytes = base64.b64decode(image_data)
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if not data or 'image' not in data:
+                return jsonify({'error': 'Nenhuma imagem fornecida'}), 400
+
+            # Decodificar imagem base64
+            image_data = data['image'].split(',')[1] if ',' in data['image'] else data['image']
+            image_bytes = base64.b64decode(image_data)
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        # Verificar se é multipart/form-data (upload de arquivo)
+        elif 'file' in request.files:
+            file = request.files['file']
+            
+            if file.filename == '':
+                return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
+            
+            # Validar tipo de arquivo
+            allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
+            if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+                return jsonify({'error': 'Tipo de arquivo nao permitido. Use: PNG, JPG, JPEG, GIF, BMP'}), 400
+            
+            # Validar tamanho (máximo 10MB)
+            file.seek(0, 2)  # Ir para o fim
+            file_size = file.tell()  # Pegar posição
+            file.seek(0)  # Voltar ao início
+            
+            if file_size > 10 * 1024 * 1024:
+                return jsonify({'error': 'Arquivo muito grande. Maximo 10MB'}), 400
+            
+            # Ler arquivo
+            file_bytes = file.read()
+            nparr = np.frombuffer(file_bytes, np.uint8)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        else:
+            return jsonify({'error': 'Envie uma imagem em base64 ou como arquivo'}), 400
 
         if image is None:
             return jsonify({'error': 'Erro ao processar imagem'}), 400
@@ -257,23 +293,30 @@ def health():
 
 if __name__ == '__main__':
     print("="*80)
-    print("🏆 TOTEM IA - API FLASK")
+    print("TOTEM IA - API FLASK")
     print("   Sistema de Deposito Inteligente de Tampinhas")
     print("="*80)
     print()
     
     if MODEL is None or SCALER is None:
-        print("⚠️  AVISO: Modelo não carregado!")
-        print("   O servidor irá retornar erros ao tentar classificar.")
+        print("AVISO: Modelo nao carregado!")
+        print("   O servidor ira retornar erros ao tentar classificar.")
         print("   Verifique se os arquivos existem:")
         print("   - models/svm/svm_model_complete.pkl")
         print("   - models/svm/scaler_complete.pkl")
         print()
     
-    print("✅ Servidor iniciando em http://0.0.0.0:5000")
+    print("Servidor iniciando em http://0.0.0.0:5000")
     print("   Acesse http://localhost:5000 no navegador")
     print()
     print("="*80)
     print()
 
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    except KeyboardInterrupt:
+        print("\nServidor interrompido pelo usuario.")
+    except Exception as e:
+        print(f"ERRO: {e}")
+        import traceback
+        traceback.print_exc()

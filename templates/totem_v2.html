@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTEM IA - Deposito Inteligente de Tampinhas</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background: white;
+            border-radius: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* HEADER */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .header-icon {
+            font-size: 2.8em;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+            margin-top: 10px;
+        }
+
+        /* CONTENT */
+        .content {
+            padding: 50px 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+            align-items: center;
+        }
+
+        /* DESCRICAO */
+        .descricao {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .descricao h2 {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .descricao-item {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+
+        .descricao-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1.2em;
+        }
+
+        .descricao-text h3 {
+            font-size: 1.1em;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .descricao-text p {
+            font-size: 0.95em;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        /* UPLOAD SECTION */
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            align-items: center;
+        }
+
+        .upload-box {
+            width: 100%;
+            border: 3px dashed #667eea;
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-box:hover {
+            border-color: #764ba2;
+            background: #ede9ff;
+            transform: translateY(-5px);
+        }
+
+        .upload-box.dragover {
+            border-color: #764ba2;
+            background: #764ba2;
+            color: white;
+        }
+
+        .upload-box.dragover .upload-icon {
+            color: white;
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            color: #667eea;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .upload-text h3 {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .upload-text p {
+            font-size: 0.95em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .upload-text .small {
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 10px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* PREVIEW */
+        .preview-container {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .preview-container.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .preview-image {
+            width: 100%;
+            max-width: 300px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+            margin-bottom: 15px;
+        }
+
+        /* BUTTONS */
+        .button-group {
+            width: 100%;
+            display: flex;
+            gap: 15px;
+            flex-direction: column;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+            width: 100%;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        /* RESULTADO */
+        .resultado {
+            display: none;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .resultado.show {
+            display: block;
+        }
+
+        .resultado-card {
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 20px;
+            color: white;
+            text-align: center;
+        }
+
+        .resultado-card.sucesso {
+            background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+            color: #333;
+        }
+
+        .resultado-card.erro {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: #333;
+        }
+
+        .resultado-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+            }
+            to {
+                transform: scale(1);
+            }
+        }
+
+        .resultado-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .resultado-message {
+            font-size: 1.1em;
+            margin-bottom: 20px;
+            opacity: 0.95;
+        }
+
+        .resultado-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .detail-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .detail-value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        /* LED VIRTUAL */
+        .led-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .led {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            opacity: 0.3;
+            transition: all 0.3s ease;
+        }
+
+        .led.active {
+            opacity: 1;
+            animation: ledPulse 1s infinite;
+        }
+
+        .led.sucesso {
+            background: radial-gradient(circle at 30% 30%, #84fab0, #50c878);
+            box-shadow: 0 0 30px rgba(132, 250, 176, 0.7);
+            color: white;
+        }
+
+        .led.erro {
+            background: radial-gradient(circle at 30% 30%, #fa709a, #f00);
+            box-shadow: 0 0 30px rgba(250, 112, 154, 0.7);
+            color: white;
+        }
+
+        @keyframes ledPulse {
+            0%, 100% {
+                box-shadow: 0 0 30px rgba(132, 250, 176, 0.7), 0 0 60px rgba(132, 250, 176, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 50px rgba(132, 250, 176, 1), 0 0 80px rgba(132, 250, 176, 0.6);
+            }
+        }
+
+        /* LOADER */
+        .loader {
+            display: none;
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .loader.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader-text {
+            margin-top: 15px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        /* RESPONSIVO */
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .descricao h2 {
+                font-size: 1.5em;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .content {
+                padding: 30px 20px;
+            }
+
+            .resultado-details {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* INFO BOX */
+        .info-box {
+            background: #f0f0f0;
+            border-left: 4px solid #667eea;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .info-box.show {
+            display: block;
+        }
+
+        .info-box i {
+            color: #667eea;
+            margin-right: 10px;
+        }
+
+        .info-text {
+            color: #333;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+
+        /* STATS */
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>
+                <i class="fas fa-circle header-icon"></i>
+                TOTEM IA
+            </h1>
+            <p>Sistema Inteligente de Deposito de Tampinhas</p>
+        </div>
+
+        <!-- CONTENT -->
+        <div class="content">
+            <!-- DESCRICAO -->
+            <div class="descricao">
+                <h2>Como Funciona?</h2>
+
+                <div class="descricao-item">
+                    <div class="descricao-icon">
+                        <i class="fas fa-camera"></i>
+                    </div>
+                    <div class="descricao-text">
+                        <h3>1. Capture a Imagem</h3>
+                        <p>Tire uma foto clara da tampinha ou faça upload de uma imagem</p>
+                    </div>
+                </div>
+
+                <div class="descricao-item">
+                    <div class="descricao-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <div class="descricao-text">
+                        <h3>2. Análise com IA</h3>
+                        <p>Nossa IA analisa a imagem usando Machine Learning avançado</p>
+                    </div>
+                </div>
+
+                <div class="descricao-item">
+                    <div class="descricao-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="descricao-text">
+                        <h3>3. Resultado Imediato</h3>
+                        <p>Receba feedback visual e sonoro em tempo real</p>
+                    </div>
+                </div>
+
+                <div class="descricao-item">
+                    <div class="descricao-icon">
+                        <i class="fas fa-recycle"></i>
+                    </div>
+                    <div class="descricao-text">
+                        <h3>4. Sustentabilidade</h3>
+                        <p>Contribua com a reciclagem de forma inteligente</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UPLOAD SECTION -->
+            <div class="upload-section">
+                <div class="upload-box" id="uploadBox">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <div class="upload-text">
+                        <h3>Selecione uma Foto</h3>
+                        <p>Arraste e solte ou clique para escolher</p>
+                        <div class="small">Formatos: JPG, PNG | Máximo: 10MB</div>
+                    </div>
+                </div>
+
+                <input type="file" id="fileInput" accept="image/*">
+
+                <!-- PREVIEW -->
+                <div class="preview-container" id="previewContainer">
+                    <img id="previewImage" class="preview-image" alt="Preview">
+                    <div class="button-group">
+                        <button class="btn btn-primary" id="classifyBtn">
+                            <i class="fas fa-sparkles"></i>
+                            Classificar Tampinha
+                        </button>
+                        <button class="btn btn-secondary" id="resetBtn">
+                            <i class="fas fa-redo"></i>
+                            Escolher Outra Foto
+                        </button>
+                    </div>
+                </div>
+
+                <!-- LOADER -->
+                <div class="loader" id="loader">
+                    <div class="spinner"></div>
+                    <div class="loader-text">Analisando imagem...</div>
+                </div>
+
+                <!-- RESULTADO -->
+                <div class="resultado" id="resultado">
+                    <div class="resultado-card" id="resultadoCard">
+                        <div class="resultado-icon" id="resultadoIcon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="resultado-title" id="resultadoTitle">Tampinha Aceita!</div>
+                        <div class="resultado-message" id="resultadoMessage">
+                            A tampinha foi classificada com sucesso!
+                        </div>
+
+                        <!-- LEDs -->
+                        <div class="led-container">
+                            <div class="led sucesso" id="ledSucesso" title="Aceita">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <div class="led erro" id="ledErro" title="Rejeitada">
+                                <i class="fas fa-times"></i>
+                            </div>
+                        </div>
+
+                        <!-- DETALHES -->
+                        <div class="resultado-details">
+                            <div class="detail-item">
+                                <span class="detail-label">Confiança</span>
+                                <span class="detail-value" id="detailConfianca">95%</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Saturação</span>
+                                <span class="detail-value" id="detailSaturacao">154.6</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Método</span>
+                                <span class="detail-value" id="detailMetodo">SAT_HIGH</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Tempo</span>
+                                <span class="detail-value" id="detailTempo">0.5s</span>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" id="novaFotoBtn" style="margin-top: 25px; width: 100%;">
+                            <i class="fas fa-camera"></i>
+                            Nova Classificação
+                        </button>
+                    </div>
+                </div>
+
+                <!-- INFO BOX -->
+                <div class="info-box" id="infoBox">
+                    <i class="fas fa-info-circle"></i>
+                    <span class="info-text" id="infoText"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const previewImage = document.getElementById('previewImage');
+        const classifyBtn = document.getElementById('classifyBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const novaFotoBtn = document.getElementById('novaFotoBtn');
+        const loader = document.getElementById('loader');
+        const resultado = document.getElementById('resultado');
+        const resultadoCard = document.getElementById('resultadoCard');
+        const infoBox = document.getElementById('infoBox');
+        const infoText = document.getElementById('infoText');
+
+        let selectedFile = null;
+        let startTime = null;
+
+        // UPLOAD BOX CLICK
+        uploadBox.addEventListener('click', () => fileInput.click());
+
+        // FILE INPUT CHANGE
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFileSelect(file);
+        });
+
+        // DRAG AND DROP
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('dragover');
+        });
+
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('dragover');
+        });
+
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) handleFileSelect(file);
+        });
+
+        function handleFileSelect(file) {
+            if (file.size > 10 * 1024 * 1024) {
+                showInfo('Arquivo muito grande! Máximo 10MB.', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewContainer.classList.add('show');
+                uploadBox.style.display = 'none';
+                resultado.classList.remove('show');
+                infoBox.classList.remove('show');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // CLASSIFY BUTTON
+        classifyBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            startTime = Date.now();
+            loader.classList.add('show');
+            previewContainer.classList.remove('show');
+            resultado.classList.remove('show');
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                try {
+                    const response = await fetch('/api/classify', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+
+                    loader.classList.remove('show');
+                    
+                    if (!response.ok) {
+                        showError(data.error || 'Erro ao processar a imagem. Tente novamente.');
+                        previewContainer.classList.add('show');
+                    } else {
+                        showResult(data, elapsedTime);
+                    }
+                } catch (error) {
+                    loader.classList.remove('show');
+                    showError('Erro ao conectar com o servidor. Tente novamente.');
+                    previewContainer.classList.add('show');
+                }
+            } catch (error) {
+                loader.classList.remove('show');
+                showError('Erro ao processar a imagem.');
+                previewContainer.classList.add('show');
+            }
+        });
+
+        function showResult(data, elapsedTime) {
+            const isSucesso = data.is_tampinha;
+            const icon = isSucesso ? 'check-circle' : 'times-circle';
+            const className = isSucesso ? 'sucesso' : 'erro';
+
+            resultadoCard.className = 'resultado-card ' + className;
+            document.getElementById('resultadoIcon').innerHTML = `<i class="fas fa-${icon}"></i>`;
+            document.getElementById('resultadoTitle').textContent = data.classification;
+            document.getElementById('resultadoMessage').textContent = data.message;
+            
+            document.getElementById('detailConfianca').textContent = `${(data.confidence * 100).toFixed(1)}%`;
+            document.getElementById('detailSaturacao').textContent = data.saturation.toFixed(1);
+            document.getElementById('detailMetodo').textContent = data.method;
+            document.getElementById('detailTempo').textContent = `${elapsedTime}s`;
+
+            // LEDs
+            document.getElementById('ledSucesso').classList.remove('active');
+            document.getElementById('ledErro').classList.remove('active');
+
+            if (isSucesso) {
+                document.getElementById('ledSucesso').classList.add('active');
+                playSound('success');
+                showInfo('Tampinha aceita com sucesso! Depositada na esteira.', 'success');
+            } else {
+                document.getElementById('ledErro').classList.add('active');
+                playSound('error');
+                showInfo('Item rejeitado. Apenas tampinhas sao aceitas!', 'error');
+            }
+
+            resultado.classList.add('show');
+        }
+
+        function showError(message) {
+            showInfo(message, 'error');
+            previewContainer.classList.add('show');
+        }
+
+        function showInfo(text, type = 'info') {
+            infoText.textContent = text;
+            infoBox.classList.add('show');
+        }
+
+        // RESET BUTTON
+        resetBtn.addEventListener('click', resetForm);
+        novaFotoBtn.addEventListener('click', resetForm);
+
+        function resetForm() {
+            selectedFile = null;
+            fileInput.value = '';
+            previewContainer.classList.remove('show');
+            uploadBox.style.display = 'block';
+            resultado.classList.remove('show');
+            infoBox.classList.remove('show');
+            loader.classList.remove('show');
+        }
+
+        // SOUND FEEDBACK
+        function playSound(type) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            oscillator.connect(gain);
+            gain.connect(audioContext.destination);
+
+            if (type === 'success') {
+                oscillator.frequency.value = 800;
+                gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } else {
+                oscillator.frequency.value = 400;
+                gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            }
+        }
+
+        // INICIALIZAR
+        window.addEventListener('load', () => {
+            showInfo('Bem-vindo ao TOTEM IA! Selecione uma foto para começar.', 'info');
+        });
+    </script>
+</body>
+</html>
