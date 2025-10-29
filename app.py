@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """
 TOTEM IA - API Flask para Classificação de Tampinhas
-=====================================================
-
-Interface backend para o totem inteligente de deposito de tampinhas.
-Integra o classificador híbrido v2 com endpoints REST.
 """
 
 from flask import Flask, render_template, request, jsonify
@@ -18,29 +14,23 @@ from pathlib import Path
 import logging
 from datetime import datetime
 
-# Configuração de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
 
-# ==============================================================================
-# CARREGAMENTO DO MODELO
-# ==============================================================================
-
 def load_classifier():
-    """Carrega o modelo SVM treinado"""
     try:
         model_path = Path('models/svm/svm_model_complete.pkl')
         scaler_path = Path('models/svm/scaler_complete.pkl')
-        
+
         if not model_path.exists() or not scaler_path.exists():
             logger.error(f"❌ Arquivos do modelo não encontrados!")
             logger.error(f"   - Procurando em: {model_path.absolute()}")
             logger.error(f"   - Procurando em: {scaler_path.absolute()}")
             return None, None
-            
+
         model = joblib.load(str(model_path))
         scaler = joblib.load(str(scaler_path))
         logger.info("✅ Modelo SVM carregado com sucesso!")
@@ -57,17 +47,12 @@ MODEL, SCALER = load_classifier()
 
 # ==============================================================================
 # FUNÇÃO DE EXTRAÇÃO DE FEATURES
-# ==============================================================================
-
 def extract_color_features(image):
-    """Extrai 24 features da imagem (numpy array)"""
     try:
-        # Redimensionar
         image = cv2.resize(image, (128, 128))
 
         features = []
 
-        # RGB stats (9)
         for channel in cv2.split(image):
             features.extend([
                 np.mean(channel),
@@ -75,7 +60,6 @@ def extract_color_features(image):
                 np.median(channel)
             ])
 
-        # HSV stats (9)
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         for channel in cv2.split(hsv):
             features.extend([
@@ -84,7 +68,6 @@ def extract_color_features(image):
                 np.median(channel)
             ])
 
-        # Shape features (6)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -118,48 +101,39 @@ def extract_color_features(image):
         logger.error(f"Erro ao extrair features: {e}")
         return None
 
-# ==============================================================================
-# FUNÇÃO DE CLASSIFICAÇÃO HÍBRIDA
-# ==============================================================================
-
 def classify_image(image):
-    """Classifica imagem usando o método híbrido v2"""
     if image is None or MODEL is None or SCALER is None:
         return None, None, None, "ERRO"
 
     try:
-        # Análise de saturação HSV
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         saturation = np.mean(hsv[:, :, 1])
 
-        # Extrair features SVM
         features = extract_color_features(image)
         if features is None or np.isnan(features).any():
             return None, None, saturation, "ERRO"
 
         features_scaled = SCALER.transform([features])
 
-        # Predição SVM
         svm_pred = MODEL.predict(features_scaled)[0]
         svm_conf = MODEL.decision_function(features_scaled)[0]
         svm_prob = 1 / (1 + np.exp(-svm_conf))
 
-        # Regra Híbrida AJUSTADA
-        if saturation > 120:  # Tampinhas com saturação alta
+        if saturation > 120:
             confidence = 0.95 if svm_pred == 1 else 0.90
             return 1, confidence, saturation, "SAT_HIGH"
-        elif saturation < 30:  # Saturação muito baixa = NÃO-TAMPINHA
+        elif saturation < 30:
             confidence = 0.95
             return 0, confidence, saturation, "SAT_VERY_LOW"
-        else:  # Zona intermediária
-            if saturation > 100:  # 100-120
+        else:
+            if saturation > 100:
                 if svm_pred == 1:
                     return 1, 0.75, saturation, "MID_HIGH_SAT"
                 else:
                     return 0, 0.65, saturation, "NOT_TAMPINHA"
-            elif saturation < 50:  # 30-50: FORÇAR TAMPINHA
+            elif saturation < 50:
                 return 1, 0.75, saturation, "LOW_SAT_FORCE_TAMPINHA"
-            else:  # 50-100
+            else:
                 if svm_pred == 1 and svm_prob > 0.8:
                     return 1, svm_prob, saturation, "SVM_HIGH_CONF"
                 else:
@@ -175,59 +149,45 @@ def classify_image(image):
 
 @app.route('/')
 def index():
-    """Página principal do totem"""
     return render_template('totem_v2.html')
 
 @app.route('/totem_v2.html')
 def totem_v2():
-    """Rota para acessar totem_v2.html diretamente"""
     return render_template('totem_v2.html')
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
-    """
-    Endpoint para classificar imagem
-    
-    Recebe: POST com imagem em base64 ou multipart/form-data
-    Retorna: JSON com classificação e detalhes
-    """
     try:
         image = None
 
-        # Verificar se é JSON com base64
         if request.is_json:
             data = request.get_json()
 
             if not data or 'image' not in data:
                 return jsonify({'error': 'Nenhuma imagem fornecida'}), 400
 
-            # Decodificar imagem base64
             image_data = data['image'].split(',')[1] if ',' in data['image'] else data['image']
             image_bytes = base64.b64decode(image_data)
             nparr = np.frombuffer(image_bytes, np.uint8)
             image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # Verificar se é multipart/form-data (upload de arquivo)
         elif 'file' in request.files:
             file = request.files['file']
             
             if file.filename == '':
                 return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
             
-            # Validar tipo de arquivo
             allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
             if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
                 return jsonify({'error': 'Tipo de arquivo nao permitido. Use: PNG, JPG, JPEG, GIF, BMP'}), 400
             
-            # Validar tamanho (máximo 10MB)
-            file.seek(0, 2)  # Ir para o fim
-            file_size = file.tell()  # Pegar posição
-            file.seek(0)  # Voltar ao início
+            file.seek(0, 2)
+            file_size = file.tell()
+            file.seek(0)
             
             if file_size > 10 * 1024 * 1024:
                 return jsonify({'error': 'Arquivo muito grande. Maximo 10MB'}), 400
             
-            # Ler arquivo
             file_bytes = file.read()
             nparr = np.frombuffer(file_bytes, np.uint8)
             image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -237,7 +197,6 @@ def api_classify():
         if image is None:
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
-        # Classificar
         pred, conf, sat, method = classify_image(image)
 
         if pred is None:
@@ -247,7 +206,6 @@ def api_classify():
                 'timestamp': datetime.now().isoformat()
             }), 500
 
-        # Preparar resposta
         is_tampinha = pred == 1
 
         response = {
@@ -279,17 +237,12 @@ def api_classify():
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    """Health check do servidor"""
     model_loaded = MODEL is not None and SCALER is not None
     return jsonify({
         'status': 'ok' if model_loaded else 'erro',
         'model_loaded': model_loaded,
         'timestamp': datetime.now().isoformat()
     })
-
-# ==============================================================================
-# MAIN
-# ==============================================================================
 
 if __name__ == '__main__':
     print("="*80)
