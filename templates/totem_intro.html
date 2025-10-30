@@ -65,7 +65,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 20px 60px rgba(255, 165, 0, 0.6), inset -5px -5px 20px rgba(0,0,0,0.2);
+            box-shadow: none;
             position: relative;
             animation: float 3s ease-in-out infinite, pulse-ball 2s ease-in-out infinite;
             cursor: pointer;
@@ -88,8 +88,8 @@
             width: 70px;
             height: 70px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            border: 3px solid white;
+            background: none;
+            border: none;
             color: white;
             font-size: 32px;
             cursor: pointer;
@@ -97,8 +97,8 @@
             justify-content: center;
             align-items: center;
             transition: all 0.3s ease;
-            backdrop-filter: blur(5px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            backdrop-filter: none;
+            box-shadow: none;
             padding: 0;
         }
 
@@ -110,9 +110,8 @@
         }
 
         .play-button-floating:hover {
-            transform: scale(1.1);
-            background: rgba(255, 255, 255, 0.3);
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+            transform: scale(1.15);
+            color: white;
         }
 
         .play-button-floating:active {
@@ -120,8 +119,8 @@
         }
 
         .play-button-floating.loaded {
-            border-color: #4CAF50;
-            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            background: none;
         }
 
         .play-button-floating.loaded i {
@@ -130,8 +129,8 @@
 
         .play-button-floating.playing {
             animation: pulse-button 1s ease-in-out infinite;
-            border-color: #4CAF50;
-            background: rgba(76, 175, 80, 0.3);
+            color: #4CAF50;
+            background: none;
         }
 
         .play-button-floating.playing i {
@@ -140,10 +139,12 @@
 
         @keyframes pulse-button {
             0%, 100% {
-                box-shadow: 0 8px 20px rgba(76, 175, 80, 0.2);
+                opacity: 1;
+                transform: scale(1);
             }
             50% {
-                box-shadow: 0 8px 30px rgba(76, 175, 80, 0.5);
+                opacity: 0.7;
+                transform: scale(1.05);
             }
         }
 
