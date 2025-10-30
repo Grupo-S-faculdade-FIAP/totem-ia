@@ -60,20 +60,179 @@
         .floating-ball {
             width: 200px;
             height: 200px;
-            background: radial-gradient(circle at 30% 30%, #FFD700, #FFA500);
+            background: radial-gradient(circle at 35% 35%, #FFED4E, #FFD700 30%, #FFA500 70%, #FF8C00);
             border-radius: 50%;
             display: flex;
             justify-content: center;
             align-items: center;
-            box-shadow: none;
+            box-shadow: 
+                /* Sombra interna para profundidade */
+                inset -20px -20px 40px rgba(0, 0, 0, 0.3),
+                inset 10px 10px 20px rgba(255, 255, 255, 0.4),
+                /* Sombra externa para volume */
+                0 30px 60px rgba(255, 165, 0, 0.5),
+                0 10px 30px rgba(0, 0, 0, 0.2);
             position: relative;
-            animation: float 3s ease-in-out infinite, pulse-ball 2s ease-in-out infinite;
+            animation: float 3s ease-in-out infinite;
             cursor: pointer;
             transition: transform 0.3s ease;
+            overflow: hidden;
+            filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.15));
+        }
+
+        /* Efeito de ondas internas */
+        .floating-ball::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.2) 20%, transparent 50%);
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 1;
+            mix-blend-mode: screen;
+        }
+
+        .floating-ball::after {
+            content: '';
+            position: absolute;
+            bottom: 10%;
+            left: 10%;
+            width: 40%;
+            height: 30%;
+            background: radial-gradient(ellipse at center, rgba(0,0,0,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: 0;
+        }
+
+        .floating-ball.speaking::before {
+            animation: wave-shine 0.6s ease-in-out infinite;
+        }
+
+        @keyframes wave-shine {
+            0%, 100% {
+                opacity: 0.1;
+                transform: scale(1) translateY(0);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.05) translateY(-5px);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px) rotateZ(0deg);
+            }
+            50% {
+                transform: translateY(-15px) rotateZ(2deg);
+            }
         }
 
         .floating-ball:hover {
             transform: scale(1.05);
+        }
+
+        /* Animação maleável quando áudio está tocando */
+        .floating-ball.speaking {
+            animation: float 3s ease-in-out infinite, 
+                       wave-morph-primary 0.8s ease-in-out infinite,
+                       wave-morph-secondary 1.3s ease-in-out infinite alternate,
+                       wave-morph-tertiary 0.5s ease-in-out infinite;
+        }
+
+        @keyframes wave-morph-primary {
+            0% {
+                border-radius: 50%;
+                transform: scaleY(1) scaleX(1);
+                box-shadow: 
+                    inset -20px -20px 40px rgba(0, 0, 0, 0.3),
+                    inset 10px 10px 20px rgba(255, 255, 255, 0.4),
+                    0 30px 60px rgba(255, 165, 0, 0.5),
+                    0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+            20% {
+                border-radius: 40% 60% 50% 50%;
+                transform: scaleY(1.12) scaleX(0.95);
+                box-shadow: 
+                    inset -25px -20px 50px rgba(0, 0, 0, 0.35),
+                    inset 15px 15px 30px rgba(255, 255, 255, 0.5),
+                    0 35px 70px rgba(255, 165, 0, 0.6),
+                    0 15px 35px rgba(0, 0, 0, 0.25);
+            }
+            40% {
+                border-radius: 50%;
+                transform: scaleY(0.88) scaleX(1.05);
+                box-shadow: 
+                    inset -18px -25px 35px rgba(0, 0, 0, 0.28),
+                    inset 8px 12px 18px rgba(255, 255, 255, 0.35),
+                    0 25px 50px rgba(255, 165, 0, 0.4),
+                    0 8px 25px rgba(0, 0, 0, 0.18);
+            }
+            60% {
+                border-radius: 55% 45% 50% 50%;
+                transform: scaleY(1.1) scaleX(0.96);
+                box-shadow: 
+                    inset -24px -19px 48px rgba(0, 0, 0, 0.32),
+                    inset 12px 14px 28px rgba(255, 255, 255, 0.45),
+                    0 32px 65px rgba(255, 165, 0, 0.55),
+                    0 12px 32px rgba(0, 0, 0, 0.22);
+            }
+            80% {
+                border-radius: 50%;
+                transform: scaleY(0.9) scaleX(1.04);
+                box-shadow: 
+                    inset -19px -23px 38px rgba(0, 0, 0, 0.29),
+                    inset 9px 11px 20px rgba(255, 255, 255, 0.38),
+                    0 27px 55px rgba(255, 165, 0, 0.45),
+                    0 9px 27px rgba(0, 0, 0, 0.19);
+            }
+            100% {
+                border-radius: 50%;
+                transform: scaleY(1) scaleX(1);
+                box-shadow: 
+                    inset -20px -20px 40px rgba(0, 0, 0, 0.3),
+                    inset 10px 10px 20px rgba(255, 255, 255, 0.4),
+                    0 30px 60px rgba(255, 165, 0, 0.5),
+                    0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+        }
+
+        @keyframes wave-morph-secondary {
+            0% {
+                border-radius: 50%;
+                filter: brightness(1);
+            }
+            25% {
+                border-radius: 40% 60% 60% 40%;
+                filter: brightness(1.05);
+            }
+            50% {
+                border-radius: 50%;
+                filter: brightness(1);
+            }
+            75% {
+                border-radius: 60% 40% 40% 60%;
+                filter: brightness(1.05);
+            }
+            100% {
+                border-radius: 50%;
+                filter: brightness(1);
+            }
+        }
+
+        @keyframes wave-morph-tertiary {
+            0% {
+                transform: scaleY(1) scaleX(1);
+            }
+            50% {
+                transform: scaleY(1.03) scaleX(0.99);
+            }
+            100% {
+                transform: scaleY(0.99) scaleX(1.01);
+            }
         }
 
         .floating-ball i {
@@ -446,6 +605,7 @@
                 playButtonSmall.classList.add('playing');
                 playButtonSmall.classList.add('loaded');
                 playingStatus.classList.add('visible');
+                audioButton.classList.add('speaking');
             });
 
             audioElement.addEventListener('pause', () => {
@@ -454,6 +614,7 @@
                 playButtonSmall.innerHTML = '<i class="fas fa-play"></i>';
                 playButtonSmall.classList.remove('playing');
                 playingStatus.classList.remove('visible');
+                audioButton.classList.remove('speaking');
             });
 
             audioElement.addEventListener('timeupdate', () => {
@@ -472,6 +633,7 @@
                 playingStatus.classList.remove('visible');
                 finishedStatus.classList.add('visible');
                 startButton.classList.add('visible');
+                audioButton.classList.remove('speaking');
             });
 
             audioElement.addEventListener('error', (e) => {
@@ -551,6 +713,59 @@
             console.log('[TOTEM] Redirecionando para captura');
             window.location.href = '/totem_v2.html';
         }
+
+        // Analisador de áudio para reações mais realistas
+        let audioContext = null;
+        let analyser = null;
+        let dataArray = null;
+
+        function initAudioAnalyzer() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                const source = audioContext.createMediaElementAudioSource(audioElement);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+            }
+        }
+
+        function updateBallWithAudio() {
+            if (!audioPlaying || !analyser) return;
+
+            analyser.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            const normalized = average / 255;
+            
+            // Pega frequências altas e baixas para mais expressão
+            const lowFreq = dataArray.slice(0, 4).reduce((a, b) => a + b) / 4 / 255;
+            const highFreq = dataArray.slice(-4).reduce((a, b) => a + b) / 4 / 255;
+
+            // Escala a bola baseado na frequência do áudio
+            const scaleY = 0.92 + normalized * 0.16;
+            const scaleX = 0.98 - (normalized * 0.08);
+            
+            // Adiciona rotação sutil
+            const rotation = Math.sin(Date.now() / 300) * 3;
+            
+            // Aplica transformações
+            audioButton.style.transform = `scaleY(${scaleY}) scaleX(${scaleX}) rotateZ(${rotation}deg)`;
+            
+            // Varia o brilho baseado em frequências altas
+            audioButton.style.filter = `brightness(${0.95 + highFreq * 0.15}) saturate(${1 + lowFreq * 0.2})`;
+
+            requestAnimationFrame(updateBallWithAudio);
+        }
+
+        // Inicializar analisador quando áudio começa
+        audioElement.addEventListener('play', () => {
+            initAudioAnalyzer();
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            updateBallWithAudio();
+        }, { once: false });
 
         // Inicializar quando página carrega
         window.addEventListener('DOMContentLoaded', () => {
