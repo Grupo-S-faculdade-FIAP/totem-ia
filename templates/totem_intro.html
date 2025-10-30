@@ -532,9 +532,6 @@
             <span class="status-text" id="playingStatus">
                 <i class="fas fa-volume-up"></i> Ouvindo...
             </span>
-            <span class="status-text" id="finishedStatus">
-                ✓ Áudio finalizado
-            </span>
         </div>
 
         <!-- Botão Começar -->
@@ -567,7 +564,6 @@
         const audioElement = document.getElementById('introAudio');
         const loadingStatus = document.getElementById('loadingStatus');
         const playingStatus = document.getElementById('playingStatus');
-        const finishedStatus = document.getElementById('finishedStatus');
 
         console.log('[TOTEM] audioButton:', audioButton);
         console.log('[TOTEM] playButtonSmall:', playButtonSmall);
@@ -575,7 +571,6 @@
         console.log('[TOTEM] audioElement:', audioElement);
         console.log('[TOTEM] loadingStatus:', loadingStatus);
         console.log('[TOTEM] playingStatus:', playingStatus);
-        console.log('[TOTEM] finishedStatus:', finishedStatus);
 
         let audioLoaded = false;
         let audioPlaying = false;
@@ -631,7 +626,6 @@
                 playButtonSmall.innerHTML = '<i class="fas fa-play"></i>';
                 playButtonSmall.classList.remove('playing');
                 playingStatus.classList.remove('visible');
-                finishedStatus.classList.add('visible');
                 startButton.classList.add('visible');
                 audioButton.classList.remove('speaking');
             });
@@ -643,8 +637,6 @@
                 console.error('[TOTEM] NetworkState:', audioElement.networkState);
                 console.error('[TOTEM] ReadyState:', audioElement.readyState);
                 loadingStatus.classList.remove('visible');
-                finishedStatus.textContent = '❌ Erro ao carregar áudio';
-                finishedStatus.classList.add('visible');
                 startButton.classList.add('visible');
             });
 
