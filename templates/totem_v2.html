@@ -76,6 +76,45 @@
             margin-top: 10px;
         }
 
+        /* AUDIO BUTTON */
+        .audio-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.5em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .audio-button:hover {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: scale(1.1);
+        }
+
+        .audio-button.playing {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+            50% { box-shadow: 0 0 0 15px rgba(255, 255, 255, 0); }
+        }
+
+        .container {
+            position: relative;
+        }
+
         /* CONTENT */
         .content {
             padding: 50px 40px;
@@ -541,6 +580,11 @@
 </head>
 <body>
     <div class="container">
+        <!-- AUDIO BUTTON -->
+        <button class="audio-button" id="audioButton" title="Ouvir sobre sustentabilidade">
+            <i class="fas fa-volume-up"></i>
+        </button>
+
         <!-- HEADER -->
         <div class="header">
             <h1>
@@ -896,7 +940,56 @@
         // INICIALIZAR
         window.addEventListener('load', () => {
             showInfo('Bem-vindo ao TOTEM IA! Clique em "Iniciar Câmera" para começar.', 'info');
+            initializeAudioButton();
         });
+
+        // AUDIO BUTTON - TEXT-TO-SPEECH SUSTENTABILIDADE
+        const audioButton = document.getElementById('audioButton');
+        let audioPlayer = null;
+
+        function initializeAudioButton() {
+            audioButton.addEventListener('click', toggleSustainabilityAudio);
+        }
+
+        async function toggleSustainabilityAudio() {
+            if (audioPlayer && !audioPlayer.paused) {
+                // Se já está tocando, parar
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                audioButton.classList.remove('playing');
+                return;
+            }
+
+            // Começar a tocar
+            try {
+                audioButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                if (!audioPlayer) {
+                    // Criar novo player
+                    audioPlayer = new Audio();
+                    audioPlayer.addEventListener('ended', () => {
+                        audioButton.classList.remove('playing');
+                        audioButton.innerHTML = '<i class="fas fa-volume-up"></i>';
+                    });
+                }
+
+                // Carregar áudio da API
+                audioPlayer.src = '/api/speech/sustainability?t=' + Date.now();
+                audioButton.classList.add('playing');
+                audioButton.innerHTML = '<i class="fas fa-volume-up"></i>';
+
+                await audioPlayer.play();
+
+            } catch (error) {
+                console.error('Erro ao reproduzir áudio:', error);
+                audioButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                showInfo('Erro ao reproduzir áudio de sustentabilidade.', 'error');
+                
+                setTimeout(() => {
+                    audioButton.innerHTML = '<i class="fas fa-volume-up"></i>';
+                }, 2000);
+            }
+        }
 
         // CLEANUP
         window.addEventListener('beforeunload', () => {

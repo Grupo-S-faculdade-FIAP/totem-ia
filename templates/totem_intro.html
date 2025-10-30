@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTEM IA - Bem-vindo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .logo {
+            font-size: 3.5rem;
+            margin-bottom: 30px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .title {
+            font-size: 2.5rem;
+            color: white;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 50px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        /* BOLA FLUTUANTE - Animação Principal */
+        .floating-ball-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 50px;
+        }
+
+        .floating-ball {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle at 30% 30%, #FFD700, #FFA500);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 20px 60px rgba(255, 165, 0, 0.6), inset -5px -5px 20px rgba(0,0,0,0.2);
+            position: relative;
+            animation: float 3s ease-in-out infinite, pulse-ball 2s ease-in-out infinite;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .floating-ball:hover {
+            transform: scale(1.05);
+        }
+
+        .floating-ball i {
+            font-size: 80px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            animation: bounce-icon 2s ease-in-out infinite;
+            display: none;
+        }
+
+        /* PLAYER NO CANTO SUPERIOR DIREITO */
+        .audio-player {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            min-width: 300px;
+            backdrop-filter: blur(10px);
+        }
+
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .player-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+        }
+
+        .player-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .play-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .play-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .play-button:active {
+            transform: scale(0.95);
+        }
+
+        .play-button.playing {
+            animation: pulse-button 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-button {
+            0%, 100% {
+                box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            }
+            50% {
+                box-shadow: 0 5px 25px rgba(102, 126, 234, 0.8);
+            }
+        }
+
+        .progress-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .player-status {
+            font-size: 0.8rem;
+            color: #999;
+            text-align: center;
+            padding: 8px 0;
+            min-height: 18px;
+        }
+
+        .player-status.loading {
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .player-status.playing {
+            color: #764ba2;
+            font-weight: 500;
+        }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .audio-player {
+                top: 20px;
+                right: 20px;
+                min-width: 280px;
+                padding: 15px;
+            }
+
+            .floating-ball {
+                width: 150px;
+                height: 150px;
+            }
+
+            .floating-ball i {
+                font-size: 60px;
+            }
+
+            .play-button {
+                width: 35px;
+                height: 35px;
+                font-size: 16px;
+            }
+        }
+
+        /* Status do áudio */
+        .audio-status {
+            font-size: 1rem;
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 30px;
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-text {
+            display: none;
+        }
+
+        .status-text.visible {
+            display: inline-block;
+            animation: fade-in 0.5s ease;
+        }
+
+        .loading-dots {
+            display: inline-block;
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% {
+                content: '';
+            }
+            40% {
+                content: '.';
+            }
+            60% {
+                content: '..';
+            }
+            80%, 100% {
+                content: '...';
+            }
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Botão Começar */
+        .start-button {
+            display: none;
+            padding: 18px 50px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 3px solid white;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            animation: slide-up 0.6s ease;
+        }
+
+        .start-button.visible {
+            display: inline-block;
+        }
+
+        .start-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        .start-button:active {
+            transform: translateY(-1px);
+        }
+
+        @keyframes slide-up {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Partículas de fundo */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            animation: particle-float 20s infinite linear;
+        }
+
+        @keyframes particle-float {
+            0% {
+                opacity: 0;
+                transform: translateY(100vh) translateX(0);
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-100vh) translateX(100px);
+            }
+        }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .title {
+                font-size: 2rem;
+            }
+
+            .subtitle {
+                font-size: 1rem;
+            }
+
+            .floating-ball {
+                width: 150px;
+                height: 150px;
+            }
+
+            .floating-ball i {
+                font-size: 60px;
+            }
+
+            .start-button {
+                padding: 15px 40px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Partículas de fundo -->
+    <div class="particles" id="particles"></div>
+
+    <!-- PLAYER DE ÁUDIO - Canto Superior Direito -->
+    <div class="audio-player">
+        <div class="player-header">
+            <p class="player-title">🎙️ Sustentabilidade</p>
+            <div class="player-controls">
+                <button class="play-button" id="playButtonSmall" title="Play/Pause">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="time-display">
+                <span id="currentTime">0:00</span>
+                <span id="duration">0:00</span>
+            </div>
+        </div>
+
+        <div class="player-status" id="playerStatus"></div>
+    </div>
+
+    <!-- Conteúdo Principal -->
+    <div class="container">
+        <div class="logo">♻️</div>
+        
+        <h1 class="title">TOTEM IA</h1>
+        <p class="subtitle">Sistema Inteligente de Coleta de Tampinhas</p>
+
+        <!-- Bola Flutuante SEM ÍCONE -->
+        <div class="floating-ball-container">
+            <div class="floating-ball" id="audioButton">
+                <!-- Sem ícone aqui -->
+            </div>
+        </div>
+
+        <!-- Status do Áudio -->
+        <div class="audio-status">
+            <span class="status-text" id="loadingStatus">
+                <i class="fas fa-spinner fa-spin"></i> Carregando áudio...
+            </span>
+            <span class="status-text" id="playingStatus">
+                <i class="fas fa-volume-up"></i> Ouvindo...
+            </span>
+            <span class="status-text" id="finishedStatus">
+                ✓ Áudio finalizado
+            </span>
+        </div>
+
+        <!-- Botão Começar -->
+        <button class="start-button" id="startButton" onclick="goToCapture()">
+            <i class="fas fa-arrow-right"></i> Começar
+        </button>
+    </div>
+
+    <!-- Elemento de Áudio Oculto -->
+    <audio id="introAudio" preload="auto" crossorigin="anonymous"></audio>
+
+    <script>
+        // Gerar partículas de fundo
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                particle.style.animationDelay = Math.random() * 5 + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // Elementos do DOM
+        const audioButton = document.getElementById('audioButton');
+        const playButtonSmall = document.getElementById('playButtonSmall');
+        const startButton = document.getElementById('startButton');
+        const audioElement = document.getElementById('introAudio');
+        const loadingStatus = document.getElementById('loadingStatus');
+        const playingStatus = document.getElementById('playingStatus');
+        const finishedStatus = document.getElementById('finishedStatus');
+        const playerStatus = document.getElementById('playerStatus');
+        const progressFill = document.getElementById('progressFill');
+        const progressBar = document.getElementById('progressBar');
+        const currentTimeEl = document.getElementById('currentTime');
+        const durationEl = document.getElementById('duration');
+
+        let audioLoaded = false;
+        let audioPlaying = false;
+
+        // Formatar tempo em MM:SS
+        function formatTime(seconds) {
+            if (!isFinite(seconds)) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Atualizar barra de progresso
+        function updateProgress() {
+            if (audioElement.duration) {
+                const percent = (audioElement.currentTime / audioElement.duration) * 100;
+                progressFill.style.width = percent + '%';
+                currentTimeEl.textContent = formatTime(audioElement.currentTime);
+                durationEl.textContent = formatTime(audioElement.duration);
+            }
+        }
+
+        // Clicar na barra de progresso
+        progressBar.addEventListener('click', (e) => {
+            if (!audioElement.duration) return;
+            const rect = progressBar.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            audioElement.currentTime = percent * audioElement.duration;
+        });
+
+        // Carregar áudio ao iniciar a página
+        function loadAudio() {
+            console.log('[TOTEM] Iniciando carregamento de áudio...');
+            loadingStatus.classList.add('visible');
+            playerStatus.classList.add('loading');
+            playerStatus.textContent = 'Carregando...';
+            
+            audioElement.src = '/api/speech/sustainability?t=' + Date.now();
+            console.log('[TOTEM] URL de áudio:', audioElement.src);
+            console.log('[TOTEM] Crossorigin:', audioElement.crossOrigin);
+            
+            audioElement.addEventListener('canplay', () => {
+                console.log('[TOTEM] Áudio pronto para reproduzir');
+                audioLoaded = true;
+                loadingStatus.classList.remove('visible');
+                playerStatus.classList.remove('loading');
+                // Iniciar reprodução automaticamente
+                playAudio();
+            }, { once: true });
+
+            audioElement.addEventListener('play', () => {
+                console.log('[TOTEM] Áudio iniciou reprodução');
+                audioPlaying = true;
+                playButtonSmall.innerHTML = '<i class="fas fa-pause"></i>';
+                playButtonSmall.classList.add('playing');
+                playingStatus.classList.add('visible');
+                playerStatus.classList.add('playing');
+                playerStatus.textContent = 'Reproduzindo...';
+            });
+
+            audioElement.addEventListener('pause', () => {
+                console.log('[TOTEM] Áudio pausado');
+                audioPlaying = false;
+                playButtonSmall.innerHTML = '<i class="fas fa-play"></i>';
+                playButtonSmall.classList.remove('playing');
+                playingStatus.classList.remove('visible');
+                playerStatus.classList.remove('playing');
+                playerStatus.textContent = 'Pausado';
+            });
+
+            audioElement.addEventListener('timeupdate', () => {
+                updateProgress();
+            });
+
+            audioElement.addEventListener('loadedmetadata', () => {
+                console.log('[TOTEM] Duração carregada:', audioElement.duration);
+                durationEl.textContent = formatTime(audioElement.duration);
+            });
+
+            audioElement.addEventListener('ended', () => {
+                console.log('[TOTEM] Áudio terminou');
+                audioPlaying = false;
+                playButtonSmall.innerHTML = '<i class="fas fa-play"></i>';
+                playButtonSmall.classList.remove('playing');
+                playingStatus.classList.remove('visible');
+                finishedStatus.classList.add('visible');
+                startButton.classList.add('visible');
+                playerStatus.classList.remove('playing');
+                playerStatus.textContent = 'Finalizado';
+            });
+
+            audioElement.addEventListener('error', (e) => {
+                console.error('[TOTEM] ❌ ERRO ao carregar áudio:', e);
+                console.error('[TOTEM] Erro code:', audioElement.error?.code);
+                console.error('[TOTEM] Erro message:', audioElement.error?.message);
+                console.error('[TOTEM] NetworkState:', audioElement.networkState);
+                console.error('[TOTEM] ReadyState:', audioElement.readyState);
+                loadingStatus.classList.remove('visible');
+                finishedStatus.textContent = '❌ Erro ao carregar áudio';
+                finishedStatus.classList.add('visible');
+                startButton.classList.add('visible');
+                playerStatus.classList.remove('loading');
+                playerStatus.textContent = 'Erro: ' + (audioElement.error?.message || 'Unknown');
+            });
+
+            console.log('[TOTEM] Definindo propriedades do áudio...');
+            audioElement.preload = 'auto';
+            audioElement.crossOrigin = 'anonymous';
+            
+            console.log('[TOTEM] Chamando load()...');
+            audioElement.load();
+        }
+
+        // Reproduzir áudio
+        function playAudio() {
+            console.log('[TOTEM] playAudio() chamado, audioLoaded:', audioLoaded);
+            if (audioLoaded) {
+                const playPromise = audioElement.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('[TOTEM] Reprodução iniciada com sucesso');
+                    }).catch(err => {
+                        console.error('[TOTEM] Erro na reprodução:', err);
+                        // Se não conseguir reproduzir, mostrar botão começar mesmo assim
+                        finishedStatus.classList.add('visible');
+                        startButton.classList.add('visible');
+                    });
+                }
+            } else {
+                console.log('[TOTEM] Áudio ainda não foi carregado');
+            }
+        }
+
+        // Controlar com botão pequeno
+        playButtonSmall.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('[TOTEM] Play button clicado');
+            
+            if (!audioLoaded) {
+                console.log('[TOTEM] Áudio não carregado, chamando loadAudio()');
+                loadAudio();
+                return;
+            }
+
+            if (audioPlaying) {
+                console.log('[TOTEM] Pausando áudio');
+                audioElement.pause();
+            } else if (audioElement.ended) {
+                // Se terminou, reiniciar do início
+                console.log('[TOTEM] Reiniciando áudio');
+                audioElement.currentTime = 0;
+                playAudio();
+            } else {
+                console.log('[TOTEM] Reproduzindo áudio');
+                playAudio();
+            }
+        });
+
+        // Pausar/Reproduzir ao clicar na bola
+        audioButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('[TOTEM] Bola clicada');
+            playButtonSmall.click();
+        });
+
+        // Redirecionar para página de captura
+        function goToCapture() {
+            console.log('[TOTEM] Redirecionando para captura');
+            window.location.href = '/totem_v2.html';
+        }
+
+        // Inicializar quando página carrega
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('[TOTEM] DOMContentLoaded - Iniciando...');
+            createParticles();
+            loadAudio();
+        });
+
+        // Log de carregamento imediato
+        console.log('[TOTEM] Script iniciado');
+    </script>
+</body>
+</html>
