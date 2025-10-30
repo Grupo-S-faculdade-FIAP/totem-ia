@@ -163,15 +163,15 @@ def classify_image(image):
 
 @app.route('/')
 def index():
-    return render_template('totem_intro.html')
+    return render_template('totem_intro.html', v=1)
 
 @app.route('/totem_intro.html')
 def totem_intro():
-    return render_template('totem_intro.html')
+    return render_template('totem_intro.html', v=1)
 
 @app.route('/totem_v2.html')
 def totem_v2():
-    return render_template('totem_v2.html')
+    return render_template('totem_v2.html', v=1)
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
