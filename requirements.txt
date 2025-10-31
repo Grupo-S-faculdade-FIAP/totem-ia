@@ -20,14 +20,14 @@ scikit-learn>=1.4.0
 joblib>=1.3.0
 matplotlib>=3.8.0
 
-# Deep Learning
-torch>=2.6.0
-torchvision>=0.20.0
-transformers>=4.36.0
+# Deep Learning - REMOVIDO PARA EVITAR ERROS DE BUILD NO RENDER
+# torch>=2.6.0
+# torchvision>=0.20.0
+# transformers>=4.36.0
 
 # Utilitários de IA
 openai==1.3.9
-huggingface-hub==0.19.4
+# huggingface-hub==0.19.4  # REMOVIDO POIS NÃO É USADO NO CÓDIGO
 tqdm>=4.66.0
 
 # APIs e Requisições
