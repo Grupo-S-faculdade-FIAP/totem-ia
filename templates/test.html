@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - TÓTEM IA</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Teste de JavaScript</h1>
+    <p id="message">Página carregada!</p>
+    <button onclick="testFunction()">Clique aqui</button>
+
+    <script>
+        console.log('Script carregado');
+
+        function testFunction() {
+            console.log('Botão clicado!');
+            document.getElementById('message').textContent = 'Botão funcionou!';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM carregado');
+        });
+    </script>
+</body>
+</html>

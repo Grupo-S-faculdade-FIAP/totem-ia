@@ -143,22 +143,33 @@ class SVMCompleteDatasetClassifier:
         
         logger.info(f"   ✅ Carregadas {count_tampinhas} imagens de /tampinhas")
         
-        # ===== NEGATIVOS: nao-tampinhas/ =====
-        nao_tampinhas_path = Path("datasets/nao-tampinhas")
-        logger.info(f"Carregando NÃO-TAMPINHAS ({nao_tampinhas_path})...")
+        # ===== NEGATIVOS: dados sintéticos =====
+        logger.info("Gerando dados sintéticos para não-tampinhas...")
         
         count_nao = 0
-        for img_file in tqdm(sorted(os.listdir(nao_tampinhas_path)), desc="Não-tampinhas", leave=False):
-            img_path = nao_tampinhas_path / img_file
-            if img_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
-                features = self.extract_color_features(str(img_path))
-                
-                if features is not None and not np.isnan(features).any():
-                    X_train.append(features)
-                    y_train.append(0)  # NÃO É TAMPINHA
-                    count_nao += 1
+        # Gerar mesma quantidade de exemplos negativos
+        total_positivos = count_colorcap + count_tampinhas
+        for _ in tqdm(range(total_positivos), desc="Sintéticos", leave=False):
+            # Simular features de não-tampinhas (cores mais variadas, menor saturação)
+            features = []
+            # RGB stats (9 valores)
+            for _ in range(3):  # R, G, B
+                mean = np.random.uniform(0.2, 0.8)  # cores variadas
+                std = np.random.uniform(0.15, 0.4)  # alta variância
+                features.extend([mean, std, mean+std, mean-std])
+            # HSV stats (9 valores)
+            for _ in range(3):  # H, S, V
+                mean = np.random.uniform(0, 1)
+                std = np.random.uniform(0.2, 0.5)  # alta variância
+                features.extend([mean, std, mean+std, mean-std])
+            # Laplaciana e outras (6 valores) - mais variadas
+            features.extend(np.random.uniform(0.3, 0.8, 6))
+            
+            X_train.append(features[:24])
+            y_train.append(0)  # NÃO É TAMPINHA
+            count_nao += 1
         
-        logger.info(f"   ✅ Carregadas {count_nao} imagens de /nao-tampinhas")
+        logger.info(f"   ✅ Geradas {count_nao} amostras sintéticas de não-tampinhas")
         
         # ===== VALIDAÇÃO: color-cap/valid =====
         valid_path = Path("datasets/color-cap/valid/images")
