@@ -6,9 +6,10 @@ SVM Classifier v3 - DATASET COMPLETO
 Treina com:
 - color-cap/train (2100 tampinhas coloridas)
 - tampinhas/ (4 tampinhas adicionais)
+- src/tampinhas/ (novas tampinhas do usuário)
 - nao-tampinhas/ (14 não-tampinhas)
 
-Total: 2118 imagens (2104 tampinhas + 14 não-tampinhas)
+Total: 2118+ imagens (2104+ tampinhas + 14 não-tampinhas)
 """
 
 import os
@@ -126,22 +127,36 @@ class SVMCompleteDatasetClassifier:
         logger.info(f"   ✅ Carregadas {count_colorcap} imagens do color-cap")
         
         # ===== POSITIVOS: tampinhas/ =====
-        tampinhas_path = Path("tampinhas")
-        logger.info(f"Carregando TAMPINHAS ({tampinhas_path})...")
+        tampinhas_paths = [
+            Path("tampinhas"),  # Pasta raiz
+            Path("src/tampinhas")  # Nova pasta
+        ]
         
         count_tampinhas = 0
-        if tampinhas_path.exists():
-            for img_file in tqdm(sorted(os.listdir(tampinhas_path)), desc="Tampinhas", leave=False):
-                img_path = tampinhas_path / img_file
-                if img_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp']:
-                    features = self.extract_color_features(str(img_path))
-                    
-                    if features is not None and not np.isnan(features).any():
-                        X_train.append(features)
-                        y_train.append(1)  # TAMPINHA
-                        count_tampinhas += 1
+        count_src_tampinhas = 0
+        for i, tampinhas_path in enumerate(tampinhas_paths):
+            logger.info(f"Carregando TAMPINHAS ({tampinhas_path})...")
+            
+            if tampinhas_path.exists():
+                folder_count = 0
+                for img_file in tqdm(sorted(os.listdir(tampinhas_path)), desc=f"Tampinhas-{tampinhas_path.name}", leave=False):
+                    img_path = tampinhas_path / img_file
+                    if img_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp']:
+                        features = self.extract_color_features(str(img_path))
+                        
+                        if features is not None and not np.isnan(features).any():
+                            X_train.append(features)
+                            y_train.append(1)  # TAMPINHA
+                            count_tampinhas += 1
+                            folder_count += 1
+                
+                if i == 0:
+                    logger.info(f"   ✅ Pasta raiz: {folder_count} imagens")
+                else:
+                    count_src_tampinhas = folder_count
+                    logger.info(f"   ✅ Pasta src/: {folder_count} imagens")
         
-        logger.info(f"   ✅ Carregadas {count_tampinhas} imagens de /tampinhas")
+        logger.info(f"   ✅ TOTAL tampinhas adicionais: {count_tampinhas} imagens")
         
         # ===== NEGATIVOS: dados sintéticos =====
         logger.info("Gerando dados sintéticos para não-tampinhas...")
