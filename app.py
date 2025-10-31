@@ -212,6 +212,11 @@ def rewards():
     """Dashboard de recompensas e pontos (legado - redireciona para finalization)"""
     return render_template('finalization.html', v=1)
 
+@app.route('/test')
+def test_page():
+    """Página de teste para debug de JavaScript"""
+    return render_template('test.html')
+
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
     try:

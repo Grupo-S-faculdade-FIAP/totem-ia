@@ -262,6 +262,10 @@
     <div class="particles" id="particlesContainer"></div>
 
     <div class="container">
+        <!-- Debug info (temporary) -->
+        <div id="debugInfo" style="background: rgba(255,255,255,0.9); color: black; padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 12px;">
+            Debug: Página carregada
+        </div>
         <!-- Thank you icon -->
         <div class="thank-you-icon">
             <i class="fas fa-check-circle"></i>
@@ -345,6 +349,15 @@
     </div>
 
     <script>
+        // Debug function
+        function updateDebug(message) {
+            const debugDiv = document.getElementById('debugInfo');
+            if (debugDiv) {
+                debugDiv.textContent = 'Debug: ' + message;
+                console.log(message);
+            }
+        }
+
         // Generate particles
         function generateParticles() {
             const container = document.getElementById('particlesContainer');
@@ -363,12 +376,20 @@
 
         // Return to main page
         function returnToMain() {
-            console.log('Retornando para página principal...');
-            window.location.href = '/totem_v2.html';
+            updateDebug('Botão "Volta ao TÓTEM" clicado - redirecionando...');
+            try {
+                window.location.href = '/totem_v2.html';
+            } catch (e) {
+                updateDebug('Erro ao redirecionar: ' + e.message);
+                // Fallback
+                window.location.href = '/';
+            }
         }
 
         // Calculate and display environmental impact
         function updateImpactMetrics(capsCount) {
+            updateDebug('Atualizando métricas para ' + capsCount + ' tampas...');
+
             // Estimates based on typical bottle cap recycling
             // 1 cap ≈ ~0.5g of plastic
             const plasticPerCap = 0.5; // grams
@@ -423,6 +444,16 @@
 
         // Add audio playback for sustainability message
         document.addEventListener('DOMContentLoaded', () => {
+            updateDebug('DOMContentLoaded - Página carregada');
+
+            // Get URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const capsCount = parseInt(urlParams.get('caps')) || 1;
+            updateDebug('Caps count from URL: ' + capsCount);
+
+            // Update metrics
+            updateImpactMetrics(capsCount);
+
             // Optional: Play success sound or sustainability audio
             const audio = new Audio('/api/speech/sustainability');
             audio.volume = 0.5;
