@@ -23,6 +23,7 @@ matplotlib>=3.8.0
 
 # Utilitários de IA
 openai==1.3.9
+kagglehub>=0.3.0
 tqdm>=4.66.0
 
 # APIs e Requisições
