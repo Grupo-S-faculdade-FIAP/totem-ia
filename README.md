@@ -143,6 +143,7 @@ plantuml totem_ia_diagram.puml
 
 #### Serviços em Nuvem
 - **Hosting**: Render (Python web service)
+- **URL**: https://totem-ia.onrender.com/
 - **Analytics**: Dashboard personalizado
 - **Backup**: Dados sincronizados automaticamente
 
@@ -281,6 +282,8 @@ git push origin main
 
 # Ou manual no dashboard Render
 ```
+
+**URL de Produção**: https://totem-ia.onrender.com/
 
 ### Testes
 ```bash
