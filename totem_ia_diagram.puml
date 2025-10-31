@@ -1,0 +1,67 @@
+@startuml Component_Diagram
+title Diagrama de Componentes - TOTEM IA
+skinparam backgroundColor #FEFEFE
+
+package "Frontend" {
+    [Interface Web] as WebUI
+    [Interface Touch] as TouchUI
+}
+
+package "Backend" {
+    [Flask App] as Flask
+    [API REST] as API
+}
+
+package "Inteligência Artificial" {
+    [Classificador SVM] as SVM
+    [Extração de Features] as Features
+    [Modelo Treinado] as Model
+}
+
+package "Dados" {
+    [Dataset de Imagens] as Dataset
+    [Banco SQLite] as DB
+}
+
+package "Infraestrutura" {
+    [Servidor Render] as Render
+    [Sistema de Arquivos] as Storage
+    [ESP32-S3-CAM] as ESP32 <<NotImplemented>>
+}
+
+WebUI --> Flask : HTTP Requests
+TouchUI --> Flask : Touch Input
+Flask --> API : Internal Calls
+API --> SVM : Classification Request
+SVM --> Features : Feature Extraction
+Features --> Model : Apply Model
+Model --> Dataset : Trained on
+Flask --> DB : Store Data
+DB --> Flask : Retrieve Stats
+Flask --> Render : Deployed on
+Render --> Storage : File Access
+ESP32 --> Flask : MQTT (Planejado)
+
+note right of SVM
+    Classifica tampinhas
+    vs objetos não-tampinhas
+    usando SVM treinado
+end note
+
+note right of ESP32
+    Módulo câmera WiFi ESP32-S3
+    para captura independente
+    (não implementado)
+end note
+
+note right of Dataset
+    4.430 imagens de treino
+    incluindo fotos adicionais
+end note
+
+note right of Render
+    Deploy no Render.com
+    Python 3.12 compatível
+end note
+
+@enduml
