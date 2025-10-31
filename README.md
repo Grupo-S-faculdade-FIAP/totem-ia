@@ -86,6 +86,27 @@ Desenvolvemos uma solução inovadora de **totem inteligente para depósito de t
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
+### Diagrama de Arquitetura (PlantUML)
+
+O projeto inclui um **diagrama completo de componentes** criado em PlantUML (`totem_ia_diagram.puml`) que detalha:
+
+- **Pacotes do Sistema**: Frontend, Backend, IA, Dados e Infraestrutura
+- **Componentes**: Interfaces, APIs, modelos de ML, bancos de dados
+- **Conexões**: Fluxos de dados e integrações entre componentes
+- **Componentes Planejados**: ESP32-S3-CAM marcado como não implementado
+- **Notas Explicativas**: Detalhes sobre funcionalidades e status de implementação
+
+**Como visualizar o diagrama:**
+```bash
+# Instalar PlantUML
+brew install plantuml
+
+# Gerar diagrama PNG
+plantuml totem_ia_diagram.puml
+
+# Ou usar extensão PlantUML no VS Code
+```
+
 ### Pipeline de Dados
 
 1. **Captura**: Usuário interage com touchscreen
@@ -106,17 +127,18 @@ Desenvolvemos uma solução inovadora de **totem inteligente para depósito de t
 - **Áudio**: Alto-falantes integrados
 
 #### Software
-- **Backend**: Python 3.13 + Flask
+- **Backend**: Python 3.12 + Flask
 - **Visão Computacional**: OpenCV 4.8+
 - **Machine Learning**: Scikit-learn (SVM)
 - **Frontend**: HTML5 + CSS3 + JavaScript
 - **Database**: SQLite (local) + PostgreSQL (nuvem)
 - **Deployment**: Render (PaaS)
+- **Diagramas**: PlantUML 1.2025+
 
 #### Inteligência Artificial
 - **Modelo**: Support Vector Machine (SVM) com kernel RBF
 - **Features**: 24 características (cores, texturas, formas)
-- **Dataset**: 4.422 imagens (2.111 tampinhas + 2.111 não-tampinhas)
+- **Dataset**: 4.430 imagens (2.215 tampinhas + 2.215 não-tampinhas)
 - **Acurácia**: 100% em treino e validação
 
 #### Serviços em Nuvem
@@ -280,15 +302,41 @@ curl http://localhost:5005/api/health
 - **F1-Score**: 1.0
 
 ### Dataset
-- **Total de imagens**: 4.422
-- **Tampinhas**: 2.111 (47.7%)
-- **Não-tampinhas**: 2.111 (47.7%)
+- **Total de imagens**: 4.430
+- **Tampinhas**: 2.215 (50%)
+- **Não-tampinhas**: 2.215 (50%)
 - **Validação**: 200 imagens
+- **Fonte**: Dataset customizado + fotos adicionais dos usuários
 
 ### Impacto Sustentável
 - **Por tampinha**: ~0.5g de plástico reciclado
 - **Benefícios**: Redução de CO2, economia de água, preservação de árvores
 - **Cálculo automático** na interface
+
+---
+
+## 📁 Arquivos do Projeto
+
+### Estrutura Principal
+```
+totem-ia/
+├── app.py                 # Aplicação Flask principal
+├── totem_ia_diagram.puml  # Diagrama de arquitetura PlantUML
+├── requirements.txt       # Dependências Python
+├── README.md             # Documentação completa
+├── start_totem.py        # Script de inicialização
+├── test_api.py           # Testes da API
+├── test_upload_api.py    # Testes de upload
+├── datasets/             # Conjunto de dados
+├── src/                  # Código fonte
+└── templates/            # Templates HTML
+```
+
+### Arquivos Importantes
+- **`totem_ia_diagram.puml`**: Diagrama completo da arquitetura em PlantUML
+- **`app.py`**: API Flask com endpoints de classificação e interface web
+- **`svm_complete_classifier.py`**: Treinamento do modelo SVM
+- **`README.md`**: Documentação técnica e de uso
 
 ---
 
@@ -311,6 +359,38 @@ Este projeto é parte do Challenge FlexMedia - FIAP. Todos os direitos reservado
 **Repositório GitHub**: [Grupo-S-faculdade-FIAP/totem-ia](https://github.com/Grupo-S-faculdade-FIAP/totem-ia)
 
 **Tutora**: Ana Cristina dos Santos (@anacrissantos)
+
+---
+
+## 🛠️ Ferramentas de Desenvolvimento
+
+### Ambiente de Desenvolvimento
+- **Editor**: Visual Studio Code
+- **Versionamento**: Git + GitHub
+- **Diagramas**: PlantUML (instalado via Homebrew)
+- **Python**: 3.12 (compatível com Render)
+- **Virtual Environment**: venv
+
+### Extensões VS Code Recomendadas
+- **Python** (Microsoft)
+- **PlantUML** (jebbs.plantuml)
+- **GitLens** (GitKraken)
+- **Prettier** (formatação)
+
+### Comandos Úteis
+```bash
+# Instalar dependências
+pip install -r requirements.txt
+
+# Executar aplicação
+python app.py
+
+# Gerar diagrama PlantUML
+plantuml totem_ia_diagram.puml
+
+# Validar sintaxe PlantUML
+plantuml -checkonly totem_ia_diagram.puml
+```
 
 ---
 
