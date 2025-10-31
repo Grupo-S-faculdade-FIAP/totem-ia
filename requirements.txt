@@ -45,3 +45,5 @@ python-dotenv==1.0.0
 # Testes
 pytest==7.4.4
 httpx==0.26.0
+
+tokenizers==0.19.1 --only-binary=:all:
