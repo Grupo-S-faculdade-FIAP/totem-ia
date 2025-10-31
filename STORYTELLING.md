@@ -6,8 +6,6 @@
 
 Em um mundo onde o plástico se tornou o símbolo da modernidade, uma crise silenciosa se desenrola. Milhões de toneladas de plástico poluem nossos oceanos, afetam a vida marinha e contribuem para as mudanças climáticas. No Brasil, país com uma das maiores biodiversidades do planeta, essa realidade é ainda mais alarmante.
 
-**Caroline**, estudante dedicada da FIAP, observava essa realidade com crescente preocupação. Durante suas aulas de Desenvolvimento de Soluções IoT com IA, ela percebeu uma oportunidade única: **combinar tecnologia de ponta com conscientização ambiental**.
-
 ### O Encontro com o Challenge FlexMedia
 
 A FlexMedia, empresa inovadora especializada em experiências interativas, lançou um desafio ambicioso: criar um totem inteligente capaz de integrar diferentes tecnologias para enriquecer experiências culturais e comerciais. Foi aí que nasceu a **visão disruptiva**: transformar um simples depósito de tampinhas em uma experiência tecnológica que educa, engaja e salva o planeta.
@@ -181,4 +179,3 @@ O TOTEM IA prova que **tecnologia e sustentabilidade não são opostos, mas alia
 
 *Desenvolvido com ❤️ pela turma de Desenvolvimento de Soluções IoT com IA - FIAP*
 *Challenge FlexMedia - Outubro 2025*</content>
-<parameter name="filePath">/Users/caroline/Desktop/FIAP/totem-ia/STORYTELLING.md
