@@ -1,5 +1,6 @@
+<!-- ARQUIVO PROCESSING NOVO VERSAO 2024 -->
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -183,67 +184,6 @@
             animation: slideUp 0.6s ease-out 0.2s both;
         }
 
-        .points-award {
-            font-size: 48px;
-            font-weight: 800;
-            color: #FFD700;
-            margin: 20px 0;
-            animation: popIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s both;
-            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-        }
-
-        @keyframes popIn {
-            0% {
-                transform: scale(0) rotate(-20deg);
-                opacity: 0;
-            }
-            50% {
-                transform: scale(1.15) rotate(5deg);
-            }
-            100% {
-                transform: scale(1) rotate(0deg);
-                opacity: 1;
-            }
-        }
-
-        .points-text {
-            font-size: 18px;
-            color: rgba(255, 255, 255, 0.9);
-            margin: 20px 0 40px;
-        }
-
-        .user-stats {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 20px;
-            padding: 20px;
-            margin: 30px 0;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .stat-row {
-            display: flex;
-            justify-content: space-around;
-            margin: 15px 0;
-        }
-
-        .stat {
-            flex: 1;
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.7);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .stat-value {
-            font-size: 28px;
-            font-weight: 700;
-            margin-top: 8px;
-        }
-
         .continue-button {
             background: white;
             color: #667eea;
@@ -321,14 +261,6 @@
             .success-text {
                 font-size: 24px;
             }
-
-            .points-award {
-                font-size: 40px;
-            }
-
-            .stat-value {
-                font-size: 24px;
-            }
         }
     </style>
 </head>
@@ -356,24 +288,10 @@
             </div>
             <div class="success-text">Tampinha Aceita! ✓</div>
             
-            <div class="points-award" id="pointsAward">+10 TAMPS</div>
-            <div class="points-text">Parabéns! Você ganhou pontos</div>
-
-            <div class="user-stats">
-                <div class="stat-row">
-                    <div class="stat">
-                        <div class="stat-label">Pontos Totais</div>
-                        <div class="stat-value" id="totalPoints">10</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-label">Tampinhas</div>
-                        <div class="stat-value" id="capsCount">1</div>
-                    </div>
-                </div>
-            </div>
+            <!-- Conteúdo de recompensas removido -->
 
             <button class="continue-button" onclick="continueFlow()">
-                Continuar <i class="fas fa-arrow-right"></i>
+                Finalizar <i class="fas fa-home"></i>
             </button>
         </div>
     </div>
@@ -407,20 +325,17 @@
                 processingScreen.style.display = 'none';
                 successScreen.classList.add('show');
                 
-                // Atualizar dados
-                document.getElementById('pointsAward').textContent = `+${pointsAwarded} TAMPS`;
-                document.getElementById('totalPoints').textContent = totalPoints;
-                document.getElementById('capsCount').textContent = capsCount;
-                
             }, 3000); // 3 segundos de processamento
         }
 
-        // Continuar fluxo
+        // Finalizar e ir para página de finalização
         function continueFlow() {
-            // Aqui você pode redirecionar para a câmera ou próxima tela
-            console.log('Continuando fluxo...');
-            // Exemplo:
-            // window.location.href = '/totem_v2.html';
+            console.log('Finalizando e indo para página de agradecimento...');
+            // Extrair parâmetros da URL para passar para a página de finalização
+            const urlParams = new URLSearchParams(window.location.search);
+            const points = urlParams.get('points') || '10';
+            const caps = urlParams.get('caps') || '1';
+            window.location.href = `/finalization?points=${points}&caps=${caps}`;
         }
 
         // Iniciar processamento quando página carregar

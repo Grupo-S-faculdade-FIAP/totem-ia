@@ -21,9 +21,6 @@ import requests
 # Importar agents e prompts
 from prompts.agents_config import get_agent
 
-# Importar sistema de recompensas
-from src.rewards_system import get_rewards_system
-
 # Carregar variáveis de ambiente
 load_dotenv()
 
@@ -179,12 +176,17 @@ def totem_v2():
 @app.route('/processing')
 def processing():
     """Tela de processamento e confirmação de tampinha"""
-    return render_template('processing.html', v=1)
+    return render_template('processing.html', v=99)  # Aumentar v força reload
+
+@app.route('/finalization')
+def finalization():
+    """Tela de finalização com agradecimento e impacto ambiental"""
+    return render_template('finalization.html', v=1)
 
 @app.route('/rewards')
 def rewards():
-    """Dashboard de recompensas e pontos"""
-    return render_template('rewards_dashboard.html', v=1)
+    """Dashboard de recompensas e pontos (legado - redireciona para finalization)"""
+    return render_template('finalization.html', v=1)
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
@@ -376,128 +378,6 @@ def get_speech_info():
         return jsonify(info)
     except Exception as e:
         logger.error(f"Erro ao obter informações do áudio: {e}")
-        return jsonify({'error': str(e)}), 500
-
-# ==============================================================================
-# SISTEMA DE RECOMPENSAS - TAMPS
-# ==============================================================================
-
-@app.route('/api/rewards/add-cap', methods=['POST'])
-def api_add_cap():
-    """
-    Adiciona uma tampinha e concede pontos ao usuário
-    Body: { user_id: string, points?: number (default 10), cap_type?: string }
-    """
-    try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        
-        if not user_id:
-            return jsonify({'error': 'user_id é obrigatório'}), 400
-        
-        points = int(data.get('points', 10))
-        cap_type = data.get('cap_type', 'plastic')
-        
-        rewards = get_rewards_system()
-        user_data = rewards.add_cap(user_id, points=points, cap_type=cap_type)
-        
-        return jsonify({
-            'success': True,
-            'message': f'Tampinha adicionada! +{points} TAMPS',
-            'points_awarded': points,
-            'user_data': user_data
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"Erro ao adicionar tampinha: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/rewards/user/<user_id>', methods=['GET'])
-def api_get_user(user_id):
-    """
-    Obtém dados do usuário (pontos totais, tampinhas depositadas, etc)
-    """
-    try:
-        rewards = get_rewards_system()
-        user_data = rewards.get_user_data(user_id)
-        
-        if not user_data:
-            return jsonify({
-                'id': user_id,
-                'total_points': 0,
-                'caps_deposited': 0,
-                'created_at': datetime.now().isoformat()
-            }), 200
-        
-        return jsonify(user_data), 200
-    
-    except Exception as e:
-        logger.error(f"Erro ao obter dados do usuário: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/rewards/partners', methods=['GET'])
-def api_get_partners():
-    """
-    Retorna lista de parceiros disponíveis para resgate
-    """
-    try:
-        rewards = get_rewards_system()
-        partners = rewards.get_partners()
-        
-        return jsonify({
-            'partners': partners,
-            'count': len(partners)
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"Erro ao obter parceiros: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/rewards/redeem', methods=['POST'])
-def api_redeem_reward():
-    """
-    Resgata uma recompensa usando pontos
-    Body: { user_id: string, partner_id: string }
-    """
-    try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        partner_id = data.get('partner_id')
-        
-        if not user_id or not partner_id:
-            return jsonify({'error': 'user_id e partner_id são obrigatórios'}), 400
-        
-        rewards = get_rewards_system()
-        result = rewards.redeem_reward(user_id, partner_id)
-        
-        if 'error' in result:
-            return jsonify(result), 400
-        
-        return jsonify(result), 200
-    
-    except Exception as e:
-        logger.error(f"Erro ao resgatar recompensa: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/rewards/leaderboard', methods=['GET'])
-def api_get_leaderboard():
-    """
-    Retorna o ranking dos top usuários por pontos
-    Query param: limit (default 10)
-    """
-    try:
-        limit = int(request.args.get('limit', 10))
-        
-        rewards = get_rewards_system()
-        leaderboard = rewards.get_leaderboard(limit=limit)
-        
-        return jsonify({
-            'leaderboard': leaderboard,
-            'count': len(leaderboard)
-        }), 200
-    
-    except Exception as e:
-        logger.error(f"Erro ao obter ranking: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
