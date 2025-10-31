@@ -28,7 +28,9 @@ O TOTEM IA não é apenas mais um totem interativo. É uma **plataforma intelige
 A equipe desenvolveu uma solução baseada em **machine learning de ponta**:
 
 ```python
+
 # SVM treinado com 4.430 imagens
+
 # Acurácia de 100% em classificação
 model = SVC(kernel='rbf', C=1.0, gamma='scale')
 ```
