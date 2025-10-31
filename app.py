@@ -63,7 +63,19 @@ MODEL, SCALER = load_classifier()
 # FUNÇÃO DE EXTRAÇÃO DE FEATURES
 def extract_color_features(image):
     try:
+        logger.debug(f"🔍 extract_color_features iniciada. Image type: {type(image)}, shape: {image.shape if hasattr(image, 'shape') else 'N/A'}")
+        
+        if not isinstance(image, np.ndarray):
+            logger.error(f"❌ Imagem não é numpy array! Tipo: {type(image)}")
+            return None
+        
+        # Verificar cv2
+        if 'cv2' not in globals():
+            logger.error("❌ cv2 não está em globals()")
+            return None
+            
         image = cv2.resize(image, (128, 128))
+        logger.debug(f"✅ Imagem redimensionada para 128x128")
 
         features = []
 
@@ -117,15 +129,27 @@ def extract_color_features(image):
 
 def classify_image(image):
     if image is None or MODEL is None or SCALER is None:
+        logger.error(f"⚠️ Prerequisitos faltando: image={image is not None}, MODEL={MODEL is not None}, SCALER={SCALER is not None}")
         return None, None, None, "ERRO"
 
     try:
+        logger.info(f"📸 Iniciando classificação. Imagem shape: {image.shape if image is not None else 'None'}")
+        
+        # Verificar se cv2 está disponível
+        if not hasattr(cv2, 'cvtColor'):
+            logger.error("❌ ERRO CRÍTICO: cv2 módulo não está completo!")
+            return None, None, None, "ERRO"
+        
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         saturation = np.mean(hsv[:, :, 1])
+        logger.info(f"✅ HSV convertido. Saturação: {saturation:.1f}")
 
         features = extract_color_features(image)
         if features is None or np.isnan(features).any():
+            logger.error("❌ Erro ao extrair features")
             return None, None, saturation, "ERRO"
+        
+        logger.info(f"✅ Features extraídas. Shape: {features.shape}")
 
         features_scaled = SCALER.transform([features])
 
@@ -172,6 +196,21 @@ def totem_intro():
 @app.route('/totem_v2.html')
 def totem_v2():
     return render_template('totem_v2.html', v=1)
+
+@app.route('/processing')
+def processing():
+    """Tela de processamento e confirmação de tampinha"""
+    return render_template('processing.html', v=99)  # Aumentar v força reload
+
+@app.route('/finalization')
+def finalization():
+    """Tela de finalização com agradecimento e impacto ambiental"""
+    return render_template('finalization.html', v=1)
+
+@app.route('/rewards')
+def rewards():
+    """Dashboard de recompensas e pontos (legado - redireciona para finalization)"""
+    return render_template('finalization.html', v=1)
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
@@ -250,8 +289,10 @@ def api_classify():
         return jsonify(response), 200
 
     except Exception as e:
+        import traceback
         logger.error(f"Erro no endpoint /classify: {e}")
-        return jsonify({'error': str(e), 'status': 'erro'}), 500
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'error': str(e), 'status': 'erro', 'traceback': traceback.format_exc()}, 500)
 
 @app.route('/api/health', methods=['GET'])
 def health():
@@ -268,160 +309,44 @@ def health():
 
 def generate_sustainability_speech(use_cache=True):
     """
-    Gera arquivo de áudio sobre sustentabilidade usando OpenAI e Hugging Face
+    Retorna arquivo de áudio sobre sustentabilidade (pré-gerado)
     """
     audio_dir = Path('static/audio')
     audio_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Arquivo único de áudio pré-gerado com o script completo (~55 segundos)
     audio_file = audio_dir / 'sustainability_speech.wav'
     
-    # Usar cache se arquivo já existe
-    if use_cache and audio_file.exists():
-        logger.info("✅ Usando áudio em cache")
+    # Se arquivo existe, usar ele
+    if audio_file.exists():
+        logger.info("✅ Usando áudio pré-gerado completo (55s)")
         return str(audio_file)
     
-    try:
-        # 1. Gerar script com OpenAI usando agent de sustentabilidade
-        logger.info("🤖 Gerando script de sustentabilidade com OpenAI...")
+    # Se não existe, criar placeholder
+    if not audio_file.exists():
+        logger.warning("⚠️ Nenhum áudio pré-gerado encontrado!")
+        logger.info("💡 Áudio esperado em: static/audio/sustainability_speech.wav")
         
-        # Obter configuração do agent de sustentabilidade
-        agent = get_agent("sustainability")
-        system_prompt = agent["system_prompt"]
-        user_prompt = agent["user_prompt"]
-        config = agent["config"]
-        
-        logger.info(f"📋 Usando agent: {agent['metadata']['name']}")
-        
-        response = openai.ChatCompletion.create(
-            model=config["model"],
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": user_prompt
-                }
-            ],
-            temperature=config["temperature"],
-            max_tokens=config["max_tokens"]
-        )
-        
-        script = response.choices[0].message.content.strip()
-        logger.info(f"✅ Script gerado!")
-        
-        # 2. Sintetizar fala com Hugging Face (PRIMEIRA TENTATIVA)
-        logger.info("🎙️ Tentando Hugging Face para síntese de fala...")
-        
-        api_url = "https://api-inference.huggingface.co/models/espnet/kan-bayashi_ljspeech_glow-tts"
-        headers = {"Authorization": f"Bearer {hf_token}"}
-        
-        payload = {"inputs": script}
-        
+        # Criar arquivo silencioso como fallback
         try:
-            tts_response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+            import wave
+            import struct
+            logger.warning("⚠️ Criando arquivo WAV de silêncio como placeholder...")
+            sample_rate = 16000
+            duration = 2
+            num_samples = sample_rate * duration
             
-            if tts_response.status_code == 200:
-                with open(audio_file, 'wb') as f:
-                    f.write(tts_response.content)
-                logger.info(f"✅ Áudio sintetizado com Hugging Face!")
-                return str(audio_file)
-            else:
-                logger.warning(f"⚠️ Hugging Face retornou status {tts_response.status_code}")
-                
-        except requests.exceptions.Timeout:
-            logger.warning("⚠️ Timeout no Hugging Face")
+            with wave.open(str(audio_file), 'w') as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(sample_rate)
+                for _ in range(num_samples):
+                    wav_file.writeframes(struct.pack('<h', 0))
         except Exception as e:
-            logger.warning(f"⚠️ Erro no Hugging Face: {e}")
-        
-        # 3. Fallback para pyttsx3 (LOCAL TEXT-TO-SPEECH)
-        logger.info("🎙️ Usando pyttsx3 para síntese de fala local...")
-        
-        try:
-            import pyttsx3
-            import os
-            import time
-            
-            # Inicializar engine
-            engine = pyttsx3.init()
-            
-            # Configurar propriedades
-            engine.setProperty('rate', 120)  # velocidade
-            engine.setProperty('volume', 0.9)  # volume
-            
-            # Salvar diretamente para arquivo
-            logger.info(f"🔍 Salvando áudio com pyttsx3...")
-            temp_aiff = str(audio_dir / 'temp_audio.aiff')
-            
-            engine.save_to_file(script, temp_aiff)
-            engine.runAndWait()
-            
-            # Aguardar para garantir que o arquivo está completo
-            time.sleep(2)
-            
-            logger.info(f"🔍 Verificando arquivo temporário: {temp_aiff}")
-            if os.path.exists(temp_aiff) and os.path.getsize(temp_aiff) > 2000:
-                logger.info(f"🔍 Arquivo AIFF criado com {os.path.getsize(temp_aiff)} bytes")
-                
-                # Converter AIFF para WAV
-                try:
-                    import soundfile as sf
-                    logger.info(f"🔍 Lendo AIFF...")
-                    data, sr = sf.read(temp_aiff)
-                    logger.info(f"🔍 Shape: {data.shape}, Taxa: {sr} Hz")
-                    
-                    logger.info(f"🔍 Escrevendo WAV...")
-                    sf.write(str(audio_file), data, sr, subtype='PCM_16')
-                    file_size = Path(audio_file).stat().st_size
-                    logger.info(f"✅ Áudio convertido! Tamanho: {file_size} bytes")
-                    
-                    # Limpezação
-                    if os.path.exists(temp_aiff):
-                        os.remove(temp_aiff)
-                    
-                    return str(audio_file)
-                    
-                except Exception as convert_err:
-                    logger.error(f"❌ Erro na conversão AIFF→WAV: {convert_err}")
-                    import traceback
-                    traceback.print_exc()
-            else:
-                logger.warning(f"⚠️ Arquivo AIFF não criado ou vazio: {os.path.getsize(temp_aiff) if os.path.exists(temp_aiff) else 'não existe'}")
-                
-        except Exception as e:
-            logger.error(f"❌ Erro com pyttsx3: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        # 4. Fallback final - criar arquivo placeholder
-        logger.warning("⚠️ Nenhum TTS funcionou, criando placeholder...")
-        
-        # Criar arquivo WAV mínimo válido com silence
-        import wave
-        import struct
-        
-        # Parâmetros de áudio
-        sample_rate = 16000
-        duration = 2  # 2 segundos de silêncio
-        num_samples = sample_rate * duration
-        
-        with wave.open(str(audio_file), 'w') as wav_file:
-            wav_file.setnchannels(1)  # mono
-            wav_file.setsampwidth(2)  # 16-bit
-            wav_file.setframerate(sample_rate)
-            
-            # Escrever silêncio (zeros)
-            for _ in range(num_samples):
-                wav_file.writeframes(struct.pack('<h', 0))
-        
-        logger.info("⚠️ Arquivo WAV placeholder criado")
-        return str(audio_file)
-        
-    except Exception as e:
-        logger.error(f"❌ Erro ao gerar áudio: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
+            logger.error(f"❌ Erro ao criar placeholder: {e}")
+            return None
+    
+    return str(audio_file)
 
 @app.route('/api/speech/sustainability', methods=['GET'])
 def get_sustainability_speech():
@@ -429,29 +354,47 @@ def get_sustainability_speech():
     Retorna o arquivo de áudio sobre sustentabilidade
     """
     try:
-        audio_file = generate_sustainability_speech()
+        logger.debug(f"🎵 Requisição de áudio recebida. Cache: {request.args.get('t', 'N/A')}")
+        
+        # Usar cache quando disponível
+        audio_file = generate_sustainability_speech(use_cache=True)
         
         if audio_file and Path(audio_file).exists():
-            file_ext = Path(audio_file).suffix.lower()
+            file_path = Path(audio_file)
+            file_size = file_path.stat().st_size
             
-            # Detectar tipo MIME baseado na extensão
+            logger.info(f"📤 Servindo áudio: {audio_file} ({file_size} bytes)")
+            
+            # Determinar tipo MIME
+            file_ext = file_path.suffix.lower()
             if file_ext == '.wav':
                 mimetype = 'audio/wav'
             elif file_ext == '.mp3':
                 mimetype = 'audio/mpeg'
             else:
-                mimetype = 'audio/mpeg'  # padrão
+                mimetype = 'audio/wav'  # padrão
             
-            return send_file(
-                audio_file,
+            # Usar send_file com range support
+            response = send_file(
+                str(file_path),
                 mimetype=mimetype,
-                as_attachment=False
+                as_attachment=False,
+                download_name='sustainability_speech.wav'
             )
+            
+            # Adicionar headers para streaming
+            response.headers['Accept-Ranges'] = 'bytes'
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            
+            logger.info(f"✅ Áudio servido com sucesso")
+            return response
         else:
+            logger.error(f"❌ Arquivo de áudio não encontrado: {audio_file}")
             return jsonify({'error': 'Arquivo de áudio não disponível'}), 500
             
     except Exception as e:
-        logger.error(f"Erro ao servir áudio: {e}")
+        logger.error(f"❌ Erro ao servir áudio: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/speech/info', methods=['GET'])
@@ -470,7 +413,7 @@ def get_speech_info():
         
         return jsonify(info)
     except Exception as e:
-        logger.error(f"Erro ao obter info de áudio: {e}")
+        logger.error(f"Erro ao obter informações do áudio: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
@@ -495,7 +438,7 @@ if __name__ == '__main__':
     print()
 
     try:
-        app.run(host='0.0.0.0', port=5003, debug=False, use_reloader=False)
+        app.run(host='0.0.0.0', port=5005, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         print("\nServidor interrompido pelo usuario.")
     except Exception as e:

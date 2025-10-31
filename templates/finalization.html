@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obrigado! - TÓTEM IA</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Animated background particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) translateX(0); opacity: 1; }
+            50% { transform: translateY(-100px) translateX(50px); opacity: 0.3; }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 600px;
+            width: 90%;
+            background: white;
+            border-radius: 30px;
+            padding: 60px 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            animation: slideUp 0.8s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .thank-you-icon {
+            font-size: 80px;
+            color: #667eea;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        h1 {
+            color: #333;
+            font-size: 42px;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        /* Impact section */
+        .impact-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 20px;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .impact-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .impact-title i {
+            color: #667eea;
+            font-size: 24px;
+        }
+
+        .impact-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .impact-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .impact-icon {
+            color: #667eea;
+            font-size: 20px;
+            margin-right: 15px;
+            margin-top: 3px;
+            flex-shrink: 0;
+        }
+
+        .impact-text {
+            color: #555;
+            line-height: 1.5;
+        }
+
+        .impact-number {
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        /* Buttons */
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 40px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            font-size: 16px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #f8f9fa;
+            transform: translateY(-3px);
+        }
+
+        /* Footer message */
+        .footer-message {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .footer-message i {
+            color: #667eea;
+            margin-right: 8px;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                padding: 40px 25px;
+            }
+
+            h1 {
+                font-size: 32px;
+            }
+
+            .thank-you-icon {
+                font-size: 60px;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .impact-section {
+                padding: 20px;
+            }
+        }
+
+        /* Loading animation */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Particles background -->
+    <div class="particles" id="particlesContainer"></div>
+
+    <div class="container">
+        <!-- Thank you icon -->
+        <div class="thank-you-icon">
+            <i class="fas fa-check-circle"></i>
+        </div>
+
+        <!-- Main message -->
+        <h1>Obrigado!</h1>
+        <p class="subtitle">
+            Sua contribuição foi registrada com sucesso.<br>
+            Você fez uma diferença no meio ambiente! 🌱
+        </p>
+
+        <!-- Impact section -->
+        <div class="impact-section">
+            <div class="impact-title">
+                <i class="fas fa-leaf"></i>
+                Seu Impacto Ambiental
+            </div>
+            
+            <div class="impact-item">
+                <div class="impact-icon">
+                    <i class="fas fa-recycle"></i>
+                </div>
+                <div class="impact-text">
+                    Você ajudou a evitar que <span class="impact-number" id="wasteReduced">500g</span> 
+                    de plástico chegasse aos oceanos.
+                </div>
+            </div>
+
+            <div class="impact-item">
+                <div class="impact-icon">
+                    <i class="fas fa-tree"></i>
+                </div>
+                <div class="impact-text">
+                    Equivalente a <span class="impact-number" id="treesEquivalent">1 árvore</span> 
+                    protegida do desmatamento.
+                </div>
+            </div>
+
+            <div class="impact-item">
+                <div class="impact-icon">
+                    <i class="fas fa-water"></i>
+                </div>
+                <div class="impact-text">
+                    Economizou aproximadamente <span class="impact-number" id="waterSaved">2L</span> 
+                    de água na produção de plástico novo.
+                </div>
+            </div>
+
+            <div class="impact-item">
+                <div class="impact-icon">
+                    <i class="fas fa-cloud"></i>
+                </div>
+                <div class="impact-text">
+                    Reduziu a emissão de <span class="impact-number" id="carbonReduced">50g</span> 
+                    de CO2 equivalente.
+                </div>
+            </div>
+        </div>
+
+        <!-- Message about sustainability -->
+        <div class="subtitle" style="background: #f0f7ff; padding: 20px; border-radius: 15px; margin: 20px 0;">
+            <i class="fas fa-info-circle" style="color: #667eea; margin-right: 10px;"></i>
+            <strong>Reciclar é importante!</strong> Cada tampinha depositada aqui é transformada em novos produtos,
+            reduzindo a demanda por plástico virgem e protegendo nossos ecossistemas.
+        </div>
+
+        <!-- Buttons -->
+        <div class="button-group">
+            <button class="btn btn-primary" onclick="returnToMain()">
+                <i class="fas fa-home"></i>
+                Volta ao TÓTEM
+            </button>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-message">
+            <i class="fas fa-heart"></i>
+            Obrigado por fazer parte da solução!
+        </div>
+    </div>
+
+    <script>
+        // Generate particles
+        function generateParticles() {
+            const container = document.getElementById('particlesContainer');
+            const particleCount = 30;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.top = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 20 + 's';
+                particle.style.animationDuration = (Math.random() * 10 + 15) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // Return to main page
+        function returnToMain() {
+            console.log('Retornando para página principal...');
+            window.location.href = '/totem_v2.html';
+        }
+
+        // Calculate and display environmental impact
+        function updateImpactMetrics(capsCount) {
+            // Estimates based on typical bottle cap recycling
+            // 1 cap ≈ ~0.5g of plastic
+            const plasticPerCap = 0.5; // grams
+            const totalPlastic = capsCount * plasticPerCap;
+
+            // 1 kg of plastic recycled ≈ saves 1/500 of a tree (rough estimate)
+            const treesEquivalent = (totalPlastic / 1000) * (1 / 0.5);
+
+            // Production of 1 kg of virgin plastic requires ~17L of water
+            const waterSaved = (totalPlastic / 1000) * 17;
+
+            // 1 kg of plastic production emits ~5kg of CO2 equivalent
+            const carbonReduced = (totalPlastic / 1000) * 5000;
+
+            // Update display
+            document.getElementById('wasteReduced').textContent = 
+                totalPlastic >= 1000 
+                    ? (totalPlastic / 1000).toFixed(1) + 'kg'
+                    : Math.round(totalPlastic) + 'g';
+
+            document.getElementById('treesEquivalent').textContent = 
+                treesEquivalent >= 1 
+                    ? treesEquivalent.toFixed(2) + ' árvores'
+                    : '1 árvore';
+
+            document.getElementById('waterSaved').textContent = 
+                waterSaved >= 1 
+                    ? waterSaved.toFixed(1) + 'L'
+                    : (waterSaved * 1000).toFixed(0) + 'mL';
+
+            document.getElementById('carbonReduced').textContent = 
+                carbonReduced >= 1000
+                    ? (carbonReduced / 1000).toFixed(2) + 'kg'
+                    : Math.round(carbonReduced) + 'g';
+        }
+
+        // Initialize on page load
+        window.addEventListener('load', () => {
+            // Generate particles
+            generateParticles();
+
+            // Get data from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const capsCount = parseInt(urlParams.get('caps')) || 1;
+
+            // Calculate impact metrics
+            updateImpactMetrics(capsCount);
+
+            // Log finalization
+            console.log(`✅ Finalização: ${capsCount} tampinha(s) depositada(s)`);
+        });
+
+        // Add audio playback for sustainability message
+        document.addEventListener('DOMContentLoaded', () => {
+            // Optional: Play success sound or sustainability audio
+            const audio = new Audio('/api/speech/sustainability');
+            audio.volume = 0.5;
+            // Uncomment to auto-play:
+            // audio.play().catch(e => console.log('Audio playback not allowed'));
+        });
+    </script>
+</body>
+</html>

@@ -12,13 +12,27 @@ Estrutura:
 
 # Import dos agents
 from .sustainability_agent import (
+    get_system_prompt,
+    get_user_prompt,
+    get_tags,
+)
+from .sustainability_prompts import (
     SYSTEM_PROMPT as SUSTAINABILITY_SYSTEM_PROMPT,
     USER_PROMPT as SUSTAINABILITY_USER_PROMPT,
-    OPENAI_CONFIG as SUSTAINABILITY_CONFIG,
-    METADATA as SUSTAINABILITY_METADATA,
-    get_user_prompt,
-    get_all_config,
 )
+
+# Configurações simples
+SUSTAINABILITY_CONFIG = {
+    "model": "gpt-3.5-turbo",
+    "temperature": 0.7,
+    "max_tokens": 500,
+}
+
+SUSTAINABILITY_METADATA = {
+    "name": "Sustainability Script Generator",
+    "version": "1.0",
+    "description": "Gera áudio sobre sustentabilidade de tampinhas recicláveis",
+}
 
 # Registry de agents disponíveis
 AGENTS = {
