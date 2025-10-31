@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Button</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        .floating-ball {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle at 30% 30%, #FFD700, #FFA500);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 20px 60px rgba(255, 165, 0, 0.6);
+            margin: 0 auto 30px;
+        }
+
+        .play-button-floating {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 3px solid white;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            padding: 0;
+        }
+
+        .play-button-floating i {
+            color: white;
+            transition: color 0.3s ease;
+            pointer-events: none;
+        }
+
+        .play-button-floating.loaded {
+            border-color: #4CAF50;
+            background: rgba(76, 175, 80, 0.2);
+        }
+
+        .play-button-floating.loaded i {
+            color: #4CAF50;
+        }
+
+        .status {
+            color: white;
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="floating-ball">
+            <button class="play-button-floating" id="playBtn" title="Play/Pause">
+                <i class="fas fa-play"></i>
+            </button>
+        </div>
+        <div class="status">Clique no botão para carregar</div>
+    </div>
+
+    <script>
+        const button = document.getElementById('playBtn');
+        const status = document.querySelector('.status');
+
+        button.addEventListener('click', () => {
+            button.classList.add('loaded');
+            status.textContent = 'Áudio carregado! (Verde)';
+        });
+    </script>
+</body>
+</html>

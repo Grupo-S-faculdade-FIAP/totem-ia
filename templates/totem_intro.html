@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTEM IA - Bem-vindo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .logo {
+            font-size: 3.5rem;
+            margin-bottom: 30px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .title {
+            font-size: 2.5rem;
+            color: white;
+            margin-bottom: 15px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 50px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        /* BOLA FLUTUANTE - Animação Principal */
+        .floating-ball-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 50px;
+        }
+
+        .floating-ball {
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle at 35% 35%, #FFED4E, #FFD700 30%, #FFA500 70%, #FF8C00);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 
+                /* Sombra interna para profundidade */
+                inset -20px -20px 40px rgba(0, 0, 0, 0.3),
+                inset 10px 10px 20px rgba(255, 255, 255, 0.4),
+                /* Sombra externa para volume */
+                0 30px 60px rgba(255, 165, 0, 0.5),
+                0 10px 30px rgba(0, 0, 0, 0.2);
+            position: relative;
+            animation: float 3s ease-in-out infinite;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            overflow: hidden;
+            filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.15));
+        }
+
+        /* Efeito de ondas internas */
+        .floating-ball::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.2) 20%, transparent 50%);
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 1;
+            mix-blend-mode: screen;
+        }
+
+        .floating-ball::after {
+            content: '';
+            position: absolute;
+            bottom: 10%;
+            left: 10%;
+            width: 40%;
+            height: 30%;
+            background: radial-gradient(ellipse at center, rgba(0,0,0,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: 0;
+        }
+
+        .floating-ball.speaking::before {
+            animation: wave-shine 0.6s ease-in-out infinite;
+        }
+
+        @keyframes wave-shine {
+            0%, 100% {
+                opacity: 0.1;
+                transform: scale(1) translateY(0);
+            }
+            50% {
+                opacity: 0.8;
+                transform: scale(1.05) translateY(-5px);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px) rotateZ(0deg);
+            }
+            50% {
+                transform: translateY(-15px) rotateZ(2deg);
+            }
+        }
+
+        .floating-ball:hover {
+            transform: scale(1.05);
+        }
+
+        /* Animação maleável quando áudio está tocando */
+        .floating-ball.speaking {
+            animation: float 3s ease-in-out infinite, 
+                       wave-morph-primary 0.8s ease-in-out infinite,
+                       wave-morph-secondary 1.3s ease-in-out infinite alternate,
+                       wave-morph-tertiary 0.5s ease-in-out infinite;
+        }
+
+        @keyframes wave-morph-primary {
+            0% {
+                border-radius: 50%;
+                transform: scaleY(1) scaleX(1);
+                box-shadow: 
+                    inset -20px -20px 40px rgba(0, 0, 0, 0.3),
+                    inset 10px 10px 20px rgba(255, 255, 255, 0.4),
+                    0 30px 60px rgba(255, 165, 0, 0.5),
+                    0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+            20% {
+                border-radius: 40% 60% 50% 50%;
+                transform: scaleY(1.12) scaleX(0.95);
+                box-shadow: 
+                    inset -25px -20px 50px rgba(0, 0, 0, 0.35),
+                    inset 15px 15px 30px rgba(255, 255, 255, 0.5),
+                    0 35px 70px rgba(255, 165, 0, 0.6),
+                    0 15px 35px rgba(0, 0, 0, 0.25);
+            }
+            40% {
+                border-radius: 50%;
+                transform: scaleY(0.88) scaleX(1.05);
+                box-shadow: 
+                    inset -18px -25px 35px rgba(0, 0, 0, 0.28),
+                    inset 8px 12px 18px rgba(255, 255, 255, 0.35),
+                    0 25px 50px rgba(255, 165, 0, 0.4),
+                    0 8px 25px rgba(0, 0, 0, 0.18);
+            }
+            60% {
+                border-radius: 55% 45% 50% 50%;
+                transform: scaleY(1.1) scaleX(0.96);
+                box-shadow: 
+                    inset -24px -19px 48px rgba(0, 0, 0, 0.32),
+                    inset 12px 14px 28px rgba(255, 255, 255, 0.45),
+                    0 32px 65px rgba(255, 165, 0, 0.55),
+                    0 12px 32px rgba(0, 0, 0, 0.22);
+            }
+            80% {
+                border-radius: 50%;
+                transform: scaleY(0.9) scaleX(1.04);
+                box-shadow: 
+                    inset -19px -23px 38px rgba(0, 0, 0, 0.29),
+                    inset 9px 11px 20px rgba(255, 255, 255, 0.38),
+                    0 27px 55px rgba(255, 165, 0, 0.45),
+                    0 9px 27px rgba(0, 0, 0, 0.19);
+            }
+            100% {
+                border-radius: 50%;
+                transform: scaleY(1) scaleX(1);
+                box-shadow: 
+                    inset -20px -20px 40px rgba(0, 0, 0, 0.3),
+                    inset 10px 10px 20px rgba(255, 255, 255, 0.4),
+                    0 30px 60px rgba(255, 165, 0, 0.5),
+                    0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+        }
+
+        @keyframes wave-morph-secondary {
+            0% {
+                border-radius: 50%;
+                filter: brightness(1);
+            }
+            25% {
+                border-radius: 40% 60% 60% 40%;
+                filter: brightness(1.05);
+            }
+            50% {
+                border-radius: 50%;
+                filter: brightness(1);
+            }
+            75% {
+                border-radius: 60% 40% 40% 60%;
+                filter: brightness(1.05);
+            }
+            100% {
+                border-radius: 50%;
+                filter: brightness(1);
+            }
+        }
+
+        @keyframes wave-morph-tertiary {
+            0% {
+                transform: scaleY(1) scaleX(1);
+            }
+            50% {
+                transform: scaleY(1.03) scaleX(0.99);
+            }
+            100% {
+                transform: scaleY(0.99) scaleX(1.01);
+            }
+        }
+
+        .floating-ball i {
+            font-size: 80px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            animation: bounce-icon 2s ease-in-out infinite;
+            display: none;
+        }
+
+        .play-button-floating {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            backdrop-filter: none;
+            box-shadow: none;
+            padding: 0;
+        }
+
+        .play-button-floating i {
+            color: white;
+            transition: color 0.3s ease;
+            pointer-events: none;
+            display: block;
+        }
+
+        .play-button-floating:hover {
+            transform: scale(1.15);
+            color: white;
+        }
+
+        .play-button-floating:active {
+            transform: scale(0.95);
+        }
+
+        .play-button-floating.loaded {
+            color: #4CAF50;
+            background: none;
+        }
+
+        .play-button-floating.loaded i {
+            color: #4CAF50;
+        }
+
+        .play-button-floating.playing {
+            animation: pulse-button 1s ease-in-out infinite;
+            color: #4CAF50;
+            background: none;
+        }
+
+        .play-button-floating.playing i {
+            color: #4CAF50;
+        }
+
+        @keyframes pulse-button {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(1.05);
+            }
+        }
+
+        /* PLAYER NO CANTO SUPERIOR DIREITO */
+        .audio-player {
+            display: none;
+        }
+
+        .player-header {
+            display: none;
+        }
+
+        .player-title {
+            display: none;
+        }
+
+        .player-controls {
+            display: none;
+        }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .audio-player {
+                top: 20px;
+                right: 20px;
+                min-width: 280px;
+                padding: 15px;
+            }
+
+            .floating-ball {
+                width: 150px;
+                height: 150px;
+            }
+
+            .floating-ball i {
+                font-size: 60px;
+            }
+
+            .play-button {
+                width: 35px;
+                height: 35px;
+                font-size: 16px;
+            }
+        }
+
+        /* Status do áudio */
+        .audio-status {
+            font-size: 1rem;
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 30px;
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .status-text {
+            display: none;
+        }
+
+        .status-text.visible {
+            display: inline-block;
+            animation: fade-in 0.5s ease;
+        }
+
+        .loading-dots {
+            display: inline-block;
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% {
+                content: '';
+            }
+            40% {
+                content: '.';
+            }
+            60% {
+                content: '..';
+            }
+            80%, 100% {
+                content: '...';
+            }
+        }
+
+        @keyframes fade-in {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Botão Começar */
+        .start-button {
+            display: none;
+            padding: 18px 50px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 3px solid white;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            animation: slide-up 0.6s ease;
+        }
+
+        .start-button.visible {
+            display: inline-block;
+        }
+
+        .start-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        .start-button:active {
+            transform: translateY(-1px);
+        }
+
+        @keyframes slide-up {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Partículas de fundo */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            animation: particle-float 20s infinite linear;
+        }
+
+        @keyframes particle-float {
+            0% {
+                opacity: 0;
+                transform: translateY(100vh) translateX(0);
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-100vh) translateX(100px);
+            }
+        }
+
+        /* Responsivo */
+        @media (max-width: 768px) {
+            .title {
+                font-size: 2rem;
+            }
+
+            .subtitle {
+                font-size: 1rem;
+            }
+
+            .floating-ball {
+                width: 150px;
+                height: 150px;
+            }
+
+            .floating-ball i {
+                font-size: 60px;
+            }
+
+            .start-button {
+                padding: 15px 40px;
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Partículas de fundo -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Conteúdo Principal -->
+    <div class="container">
+        <div class="logo">♻️</div>
+        
+        <h1 class="title">TOTEM IA</h1>
+        <p class="subtitle">Sistema Inteligente de Coleta de Tampinhas</p>
+
+        <!-- Bola Flutuante SEM ÍCONE -->
+        <div class="floating-ball-container">
+            <div class="floating-ball" id="audioButton">
+                <button class="play-button-floating" id="playButtonSmall" title="Play/Pause">
+                    <i class="fas fa-play"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Status do Áudio -->
+        <div class="audio-status">
+            <span class="status-text" id="loadingStatus">
+                <i class="fas fa-spinner fa-spin"></i> Carregando áudio...
+            </span>
+            <span class="status-text" id="playingStatus">
+                <i class="fas fa-volume-up"></i> Ouvindo...
+            </span>
+        </div>
+
+        <!-- Botão Começar -->
+        <button class="start-button" id="startButton" onclick="goToCapture()">
+            <i class="fas fa-arrow-right"></i> Começar
+        </button>
+    </div>
+
+    <!-- Elemento de Áudio Oculto -->
+    <audio id="introAudio" preload="auto" crossorigin="anonymous"></audio>
+
+    <script>
+        // Gerar partículas de fundo
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDuration = (10 + Math.random() * 10) + 's';
+                particle.style.animationDelay = Math.random() * 5 + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // Elementos do DOM
+        const audioButton = document.getElementById('audioButton');
+        const playButtonSmall = document.getElementById('playButtonSmall');
+        const startButton = document.getElementById('startButton');
+        const audioElement = document.getElementById('introAudio');
+        const loadingStatus = document.getElementById('loadingStatus');
+        const playingStatus = document.getElementById('playingStatus');
+
+        console.log('[TOTEM] audioButton:', audioButton);
+        console.log('[TOTEM] playButtonSmall:', playButtonSmall);
+        console.log('[TOTEM] startButton:', startButton);
+        console.log('[TOTEM] audioElement:', audioElement);
+        console.log('[TOTEM] loadingStatus:', loadingStatus);
+        console.log('[TOTEM] playingStatus:', playingStatus);
+
+        let audioLoaded = false;
+        let audioPlaying = false;
+
+        // Carregar áudio ao iniciar a página
+        function loadAudio() {
+            console.log('[TOTEM] Iniciando carregamento de áudio...');
+            loadingStatus.classList.add('visible');
+            
+            audioElement.src = '/api/speech/sustainability?t=' + Date.now();
+            console.log('[TOTEM] URL de áudio:', audioElement.src);
+            console.log('[TOTEM] Crossorigin:', audioElement.crossOrigin);
+            
+            audioElement.addEventListener('canplay', () => {
+                console.log('[TOTEM] Áudio pronto para reproduzir');
+                audioLoaded = true;
+                loadingStatus.classList.remove('visible');
+                playButtonSmall.classList.add('loaded');
+                // Iniciar reprodução automaticamente
+                playAudio();
+            }, { once: true });
+
+            audioElement.addEventListener('play', () => {
+                console.log('[TOTEM] Áudio iniciou reprodução');
+                audioPlaying = true;
+                playButtonSmall.innerHTML = '<i class="fas fa-pause"></i>';
+                playButtonSmall.classList.add('playing');
+                playButtonSmall.classList.add('loaded');
+                playingStatus.classList.add('visible');
+                audioButton.classList.add('speaking');
+            });
+
+            audioElement.addEventListener('pause', () => {
+                console.log('[TOTEM] Áudio pausado');
+                audioPlaying = false;
+                playButtonSmall.innerHTML = '<i class="fas fa-play"></i>';
+                playButtonSmall.classList.remove('playing');
+                playingStatus.classList.remove('visible');
+                audioButton.classList.remove('speaking');
+            });
+
+            audioElement.addEventListener('timeupdate', () => {
+                // atualizar progresso se necessário
+            });
+
+            audioElement.addEventListener('loadedmetadata', () => {
+                console.log('[TOTEM] Duração carregada:', audioElement.duration);
+            });
+
+            audioElement.addEventListener('ended', () => {
+                console.log('[TOTEM] Áudio terminou');
+                audioPlaying = false;
+                playButtonSmall.innerHTML = '<i class="fas fa-play"></i>';
+                playButtonSmall.classList.remove('playing');
+                playingStatus.classList.remove('visible');
+                startButton.classList.add('visible');
+                audioButton.classList.remove('speaking');
+            });
+
+            audioElement.addEventListener('error', (e) => {
+                console.error('[TOTEM] ❌ ERRO ao carregar áudio:', e);
+                console.error('[TOTEM] Erro code:', audioElement.error?.code);
+                console.error('[TOTEM] Erro message:', audioElement.error?.message);
+                console.error('[TOTEM] NetworkState:', audioElement.networkState);
+                console.error('[TOTEM] ReadyState:', audioElement.readyState);
+                loadingStatus.classList.remove('visible');
+                startButton.classList.add('visible');
+            });
+
+            console.log('[TOTEM] Definindo propriedades do áudio...');
+            audioElement.preload = 'auto';
+            audioElement.crossOrigin = 'anonymous';
+            
+            console.log('[TOTEM] Chamando load()...');
+            audioElement.load();
+        }
+
+        // Reproduzir áudio
+        function playAudio() {
+            console.log('[TOTEM] playAudio() chamado, audioLoaded:', audioLoaded);
+            if (audioLoaded) {
+                const playPromise = audioElement.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('[TOTEM] Reprodução iniciada com sucesso');
+                    }).catch(err => {
+                        console.error('[TOTEM] Erro na reprodução:', err);
+                        // Se não conseguir reproduzir, mostrar botão começar mesmo assim
+                        finishedStatus.classList.add('visible');
+                        startButton.classList.add('visible');
+                    });
+                }
+            } else {
+                console.log('[TOTEM] Áudio ainda não foi carregado');
+            }
+        }
+
+        // Controlar com botão pequeno
+        playButtonSmall.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('[TOTEM] Play button clicado');
+            
+            if (!audioLoaded) {
+                console.log('[TOTEM] Áudio não carregado, chamando loadAudio()');
+                loadAudio();
+                return;
+            }
+
+            if (audioPlaying) {
+                console.log('[TOTEM] Pausando áudio');
+                audioElement.pause();
+            } else if (audioElement.ended) {
+                // Se terminou, reiniciar do início
+                console.log('[TOTEM] Reiniciando áudio');
+                audioElement.currentTime = 0;
+                playAudio();
+            } else {
+                console.log('[TOTEM] Reproduzindo áudio');
+                playAudio();
+            }
+        });
+
+        // Pausar/Reproduzir ao clicar na bola
+        audioButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('[TOTEM] Bola clicada');
+            playButtonSmall.click();
+        });
+
+        // Redirecionar para página de captura
+        function goToCapture() {
+            console.log('[TOTEM] Redirecionando para captura');
+            window.location.href = '/totem_v2.html';
+        }
+
+        // Analisador de áudio para reações mais realistas
+        let audioContext = null;
+        let analyser = null;
+        let dataArray = null;
+
+        function initAudioAnalyzer() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                const source = audioContext.createMediaElementAudioSource(audioElement);
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+            }
+        }
+
+        function updateBallWithAudio() {
+            if (!audioPlaying || !analyser) return;
+
+            analyser.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            const normalized = average / 255;
+            
+            // Pega frequências altas e baixas para mais expressão
+            const lowFreq = dataArray.slice(0, 4).reduce((a, b) => a + b) / 4 / 255;
+            const highFreq = dataArray.slice(-4).reduce((a, b) => a + b) / 4 / 255;
+
+            // Escala a bola baseado na frequência do áudio
+            const scaleY = 0.92 + normalized * 0.16;
+            const scaleX = 0.98 - (normalized * 0.08);
+            
+            // Adiciona rotação sutil
+            const rotation = Math.sin(Date.now() / 300) * 3;
+            
+            // Aplica transformações
+            audioButton.style.transform = `scaleY(${scaleY}) scaleX(${scaleX}) rotateZ(${rotation}deg)`;
+            
+            // Varia o brilho baseado em frequências altas
+            audioButton.style.filter = `brightness(${0.95 + highFreq * 0.15}) saturate(${1 + lowFreq * 0.2})`;
+
+            requestAnimationFrame(updateBallWithAudio);
+        }
+
+        // Inicializar analisador quando áudio começa
+        audioElement.addEventListener('play', () => {
+            initAudioAnalyzer();
+            if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            updateBallWithAudio();
+        }, { once: false });
+
+        // Inicializar quando página carrega
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('[TOTEM] DOMContentLoaded - Iniciando...');
+            createParticles();
+            loadAudio();
+        });
+
+        // Log de carregamento imediato
+        console.log('[TOTEM] Script iniciado');
+    </script>
+</body>
+</html>

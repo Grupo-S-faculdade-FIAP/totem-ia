@@ -76,6 +76,45 @@
             margin-top: 10px;
         }
 
+        /* AUDIO BUTTON */
+        .audio-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 1.5em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .audio-button:hover {
+            background: rgba(255, 255, 255, 0.4);
+            border-color: rgba(255, 255, 255, 0.8);
+            transform: scale(1.1);
+        }
+
+        .audio-button.playing {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+            50% { box-shadow: 0 0 0 15px rgba(255, 255, 255, 0); }
+        }
+
+        .container {
+            position: relative;
+        }
+
         /* CONTENT */
         .content {
             padding: 50px 40px;
@@ -129,7 +168,7 @@
             line-height: 1.5;
         }
 
-        /* UPLOAD SECTION */
+        /* CAMERA SECTION */
         .upload-section {
             display: flex;
             flex-direction: column;
@@ -139,31 +178,67 @@
 
         .upload-box {
             width: 100%;
-            border: 3px dashed #667eea;
+            border: 3px solid #667eea;
             border-radius: 20px;
-            padding: 40px 30px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: #f8f9ff;
-            position: relative;
             overflow: hidden;
+            background: #000;
+            position: relative;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .upload-box:hover {
             border-color: #764ba2;
-            background: #ede9ff;
-            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
         }
 
-        .upload-box.dragover {
-            border-color: #764ba2;
-            background: #764ba2;
-            color: white;
+        #videoPreview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
-        .upload-box.dragover .upload-icon {
-            color: white;
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 3px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .camera-reticle {
+            width: 60%;
+            height: 60%;
+            border: 3px solid rgba(102, 126, 234, 0.6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .camera-reticle::before,
+        .camera-reticle::after {
+            content: '';
+            position: absolute;
+            background: rgba(102, 126, 234, 0.6);
+        }
+
+        .camera-reticle::before {
+            width: 30%;
+            height: 2px;
+        }
+
+        .camera-reticle::after {
+            width: 2px;
+            height: 30%;
         }
 
         .upload-icon {
@@ -505,6 +580,11 @@
 </head>
 <body>
     <div class="container">
+        <!-- AUDIO BUTTON -->
+        <button class="audio-button" id="audioButton" title="Ouvir sobre sustentabilidade">
+            <i class="fas fa-volume-up"></i>
+        </button>
+
         <!-- HEADER -->
         <div class="header">
             <h1>
@@ -561,20 +641,14 @@
                 </div>
             </div>
 
-            <!-- UPLOAD SECTION -->
+            <!-- CAMERA SECTION -->
             <div class="upload-section">
                 <div class="upload-box" id="uploadBox">
-                    <div class="upload-icon">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                    </div>
-                    <div class="upload-text">
-                        <h3>Selecione uma Foto</h3>
-                        <p>Arraste e solte ou clique para escolher</p>
-                        <div class="small">Formatos: JPG, PNG | Máximo: 10MB</div>
+                    <video id="videoPreview" autoplay playsinline></video>
+                    <div class="camera-overlay">
+                        <div class="camera-reticle"></div>
                     </div>
                 </div>
-
-                <input type="file" id="fileInput" accept="image/*">
 
                 <!-- PREVIEW -->
                 <div class="preview-container" id="previewContainer">
@@ -586,9 +660,17 @@
                         </button>
                         <button class="btn btn-secondary" id="resetBtn">
                             <i class="fas fa-redo"></i>
-                            Escolher Outra Foto
+                            Tirar Outra Foto
                         </button>
                     </div>
+                </div>
+
+                <!-- CAMERA CONTROLS -->
+                <div class="button-group" id="cameraControls">
+                    <button class="btn btn-primary" id="startCameraBtn">
+                        <i class="fas fa-video"></i>
+                        Iniciar Câmera
+                    </button>
                 </div>
 
                 <!-- LOADER -->
@@ -656,68 +738,79 @@
 
     <script>
         const uploadBox = document.getElementById('uploadBox');
+        const videoPreview = document.getElementById('videoPreview');
         const fileInput = document.getElementById('fileInput');
         const previewContainer = document.getElementById('previewContainer');
         const previewImage = document.getElementById('previewImage');
         const classifyBtn = document.getElementById('classifyBtn');
         const resetBtn = document.getElementById('resetBtn');
         const novaFotoBtn = document.getElementById('novaFotoBtn');
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const cameraControls = document.getElementById('cameraControls');
         const loader = document.getElementById('loader');
         const resultado = document.getElementById('resultado');
         const resultadoCard = document.getElementById('resultadoCard');
         const infoBox = document.getElementById('infoBox');
         const infoText = document.getElementById('infoText');
 
-        let selectedFile = null;
+        let stream = null;
+        let cameraActive = false;
+        let capturedImage = null;
         let startTime = null;
 
-        // UPLOAD BOX CLICK
-        uploadBox.addEventListener('click', () => fileInput.click());
+        // START CAMERA
+        startCameraBtn.addEventListener('click', initializeCamera);
 
-        // FILE INPUT CHANGE
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) handleFileSelect(file);
-        });
+        async function initializeCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
 
-        // DRAG AND DROP
-        uploadBox.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadBox.classList.add('dragover');
-        });
-
-        uploadBox.addEventListener('dragleave', () => {
-            uploadBox.classList.remove('dragover');
-        });
-
-        uploadBox.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadBox.classList.remove('dragover');
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) handleFileSelect(file);
-        });
-
-        function handleFileSelect(file) {
-            if (file.size > 10 * 1024 * 1024) {
-                showInfo('Arquivo muito grande! Máximo 10MB.', 'error');
-                return;
+                videoPreview.srcObject = stream;
+                cameraActive = true;
+                startCameraBtn.innerHTML = '<i class="fas fa-camera"></i> Capturar Foto';
+                startCameraBtn.onclick = capturePhoto;
+                showInfo('Câmera iniciada! Clique em "Capturar Foto" para fotografar.', 'info');
+            } catch (error) {
+                showInfo('Erro ao acessar a câmera. Verifique as permissões.', 'error');
+                console.error(error);
             }
+        }
 
-            selectedFile = file;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                previewImage.src = e.target.result;
-                previewContainer.classList.add('show');
-                uploadBox.style.display = 'none';
-                resultado.classList.remove('show');
-                infoBox.classList.remove('show');
-            };
-            reader.readAsDataURL(file);
+        function capturePhoto() {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = videoPreview.videoWidth;
+            canvas.height = videoPreview.videoHeight;
+
+            context.drawImage(videoPreview, 0, 0, canvas.width, canvas.height);
+            capturedImage = canvas.toDataURL('image/jpeg');
+
+            previewImage.src = capturedImage;
+            previewContainer.classList.add('show');
+            uploadBox.style.display = 'none';
+            resultado.classList.remove('show');
+            infoBox.classList.remove('show');
+
+            startCameraBtn.innerHTML = '<i class="fas fa-redo"></i> Retomar Câmera';
+            startCameraBtn.onclick = resumeCamera;
+        }
+
+        function resumeCamera() {
+            previewContainer.classList.remove('show');
+            uploadBox.style.display = 'flex';
+            resultado.classList.remove('show');
+            infoBox.classList.remove('show');
+
+            startCameraBtn.innerHTML = '<i class="fas fa-camera"></i> Capturar Foto';
+            startCameraBtn.onclick = capturePhoto;
         }
 
         // CLASSIFY BUTTON
         classifyBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
+            if (!capturedImage) return;
 
             startTime = Date.now();
             loader.classList.add('show');
@@ -725,21 +818,24 @@
             resultado.classList.remove('show');
 
             try {
+                // Converter base64 para blob
+                const response = await fetch(capturedImage);
+                const blob = await response.blob();
                 const formData = new FormData();
-                formData.append('file', selectedFile);
+                formData.append('file', blob, 'capture.jpg');
 
                 try {
-                    const response = await fetch('/api/classify', {
+                    const classifyResponse = await fetch('/api/classify', {
                         method: 'POST',
                         body: formData
                     });
 
-                    const data = await response.json();
+                    const data = await classifyResponse.json();
                     const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
 
                     loader.classList.remove('show');
-                    
-                    if (!response.ok) {
+
+                    if (!classifyResponse.ok) {
                         showError(data.error || 'Erro ao processar a imagem. Tente novamente.');
                         previewContainer.classList.add('show');
                     } else {
@@ -804,13 +900,17 @@
         novaFotoBtn.addEventListener('click', resetForm);
 
         function resetForm() {
-            selectedFile = null;
-            fileInput.value = '';
+            capturedImage = null;
             previewContainer.classList.remove('show');
-            uploadBox.style.display = 'block';
+            uploadBox.style.display = 'flex';
             resultado.classList.remove('show');
             infoBox.classList.remove('show');
             loader.classList.remove('show');
+
+            if (cameraActive) {
+                startCameraBtn.innerHTML = '<i class="fas fa-camera"></i> Capturar Foto';
+                startCameraBtn.onclick = capturePhoto;
+            }
         }
 
         // SOUND FEEDBACK
@@ -839,7 +939,63 @@
 
         // INICIALIZAR
         window.addEventListener('load', () => {
-            showInfo('Bem-vindo ao TOTEM IA! Selecione uma foto para começar.', 'info');
+            showInfo('Bem-vindo ao TOTEM IA! Clique em "Iniciar Câmera" para começar.', 'info');
+            initializeAudioButton();
+        });
+
+        // AUDIO BUTTON - TEXT-TO-SPEECH SUSTENTABILIDADE
+        const audioButton = document.getElementById('audioButton');
+        let audioPlayer = null;
+
+        function initializeAudioButton() {
+            audioButton.addEventListener('click', toggleSustainabilityAudio);
+        }
+
+        async function toggleSustainabilityAudio() {
+            if (audioPlayer && !audioPlayer.paused) {
+                // Se já está tocando, parar
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                audioButton.classList.remove('playing');
+                return;
+            }
+
+            // Começar a tocar
+            try {
+                audioButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                if (!audioPlayer) {
+                    // Criar novo player
+                    audioPlayer = new Audio();
+                    audioPlayer.addEventListener('ended', () => {
+                        audioButton.classList.remove('playing');
+                        audioButton.innerHTML = '<i class="fas fa-volume-up"></i>';
+                    });
+                }
+
+                // Carregar áudio da API
+                audioPlayer.src = '/api/speech/sustainability?t=' + Date.now();
+                audioButton.classList.add('playing');
+                audioButton.innerHTML = '<i class="fas fa-volume-up"></i>';
+
+                await audioPlayer.play();
+
+            } catch (error) {
+                console.error('Erro ao reproduzir áudio:', error);
+                audioButton.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                showInfo('Erro ao reproduzir áudio de sustentabilidade.', 'error');
+                
+                setTimeout(() => {
+                    audioButton.innerHTML = '<i class="fas fa-volume-up"></i>';
+                }, 2000);
+            }
+        }
+
+        // CLEANUP
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
         });
     </script>
 </body>
