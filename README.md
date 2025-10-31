@@ -4,7 +4,15 @@
 
 **Turma:** Desenvolvimento de Soluções IoT com IA  
 **Grupo:** Grupo-S-faculdade-FIAP  
-**Sprint:** 1 - Proposta Técnica e Arquitetura Inicial
+**Sprint:** 1 - Proposta Técnica e Arquitetura Inicial MVP
+
+
+## 👥 *Integrantes do Grupo*
+•⁠  ⁠*Caroline Correa*
+•⁠  ⁠*Tiago Lindgren*
+•⁠  ⁠*Marcelo Mizuta*
+•⁠  ⁠*Gabriel Marques*
+•⁠  ⁠*Vinicius Vinha*
 
 ---
 
