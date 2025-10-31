@@ -62,7 +62,7 @@ Desenvolvemos uma solução inovadora de **totem inteligente para depósito de t
    - Dados ambientais (quantidade de tampinhas, impacto sustentável)
 
 3. **Estruturar arquitetura técnica**
-   - Hardware: Raspberry Pi + câmera + touchscreen
+   - Hardware: ESP32-S3-CAM + touchscreen
    - Software: Flask + OpenCV + Scikit-learn
    - Nuvem: Render para deployment
 
@@ -129,8 +129,8 @@ plantuml totem_ia_diagram.puml
 ### Tecnologias Utilizadas
 
 #### Hardware
-- **Computador Principal**: Raspberry Pi 4/5
-- **Câmera**: Webcam USB ou Raspberry Pi Camera
+- **Computador Principal**: ESP32-S3-CAM (com câmera integrada)
+- **Câmera**: Integrada no ESP32-S3-CAM
 - **ESP32-S3-CAM**: Módulo câmera WiFi (planejado, não implementado)
 - **Display**: Touchscreen 7-10 polegadas
 - **Sensores**: PIR (presença), botões capacitivos
@@ -162,7 +162,7 @@ plantuml totem_ia_diagram.puml
 #### ESP32-S3-CAM
 - **Descrição**: Módulo câmera WiFi com processador ESP32-S3 para captura independente de imagens
 - **Objetivo**: Permitir captura remota e processamento distribuído
-- **Integração Planejada**: Comunicação MQTT com Raspberry Pi principal
+- **Integração Planejada**: Comunicação MQTT com sistema principal
 - **Status**: Especificado na arquitetura, implementação pendente para próximas sprints
 
 ---

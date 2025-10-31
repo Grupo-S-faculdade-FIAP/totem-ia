@@ -23,14 +23,21 @@ package "Dados" {
     [Banco SQLite] as DB
 }
 
+package "Hardware Principal" {
+    [ESP32-S3-CAM] as ESP32
+    [Câmera Integrada] as Camera
+    [Interface Touch] as Touch
+}
+
 package "Infraestrutura" {
     [Servidor Render] as Render
     [Sistema de Arquivos] as Storage
-    [ESP32-S3-CAM] as ESP32 <<NotImplemented>>
 }
 
 WebUI --> Flask : HTTP Requests
-TouchUI --> Flask : Touch Input
+Touch --> ESP32 : Touch Input
+ESP32 --> Flask : Data Processing
+Camera --> ESP32 : Image Capture
 Flask --> API : Internal Calls
 API --> SVM : Classification Request
 SVM --> Features : Feature Extraction
@@ -40,7 +47,6 @@ Flask --> DB : Store Data
 DB --> Flask : Retrieve Stats
 Flask --> Render : Deployed on
 Render --> Storage : File Access
-ESP32 --> Flask : MQTT (Planejado)
 
 note right of SVM
     Classifica tampinhas
@@ -49,9 +55,9 @@ note right of SVM
 end note
 
 note right of ESP32
-    Módulo câmera WiFi ESP32-S3
-    para captura independente
-    (não implementado)
+    ESP32-S3-CAM principal
+    com câmera integrada
+    e interface touch
 end note
 
 note right of Dataset
