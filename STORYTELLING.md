@@ -111,11 +111,6 @@ A visão vai além do presente:
 - Aprendizado colaborativo
 - Espírito de inovação
 
-**Ana Cristina dos Santos** - Mentora Inspiradora
-- Orientação especializada
-- Suporte metodológico
-- Experiência em IoT e IA
-
 ---
 
 ## 🎯 O Impacto Social e Empresarial
