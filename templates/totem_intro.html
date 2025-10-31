@@ -333,6 +333,15 @@
                 padding: 15px;
             }
 
+            .floating-ball-container {
+                width: 150px;
+                height: 150px;
+                margin: 20px auto 30px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
             .floating-ball {
                 width: 150px;
                 height: 150px;
@@ -480,12 +489,32 @@
 
         /* Responsivo */
         @media (max-width: 768px) {
+            body {
+                padding: 10px;
+                align-items: flex-start;
+                padding-top: 50px;
+            }
+
+            .container {
+                width: 100%;
+                max-width: none;
+            }
+
             .title {
                 font-size: 2rem;
             }
 
             .subtitle {
                 font-size: 1rem;
+            }
+
+            .floating-ball-container {
+                width: 150px;
+                height: 150px;
+                margin: 20px auto 30px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
             }
 
             .floating-ball {
@@ -497,9 +526,43 @@
                 font-size: 60px;
             }
 
+        /* Responsivo para telas muito pequenas */
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+                padding-top: 30px;
+            }
+
+            .container {
+                padding: 15px;
+            }
+
+            .title {
+                font-size: 1.8rem;
+            }
+
+            .subtitle {
+                font-size: 0.9rem;
+            }
+
+            .floating-ball-container {
+                width: 130px;
+                height: 130px;
+                margin: 15px auto 25px;
+            }
+
+            .floating-ball {
+                width: 130px;
+                height: 130px;
+            }
+
+            .floating-ball i {
+                font-size: 50px;
+            }
+
             .start-button {
-                padding: 15px 40px;
-                font-size: 1rem;
+                padding: 12px 30px;
+                font-size: 0.9rem;
             }
         }
     </style>
@@ -530,7 +593,7 @@
                 <i class="fas fa-spinner fa-spin"></i> Carregando áudio...
             </span>
             <span class="status-text" id="playingStatus">
-                <i class="fas fa-volume-up"></i> Ouvindo...
+                <i class="fas fa-volume-up"></i> Falando...
             </span>
         </div>
 
