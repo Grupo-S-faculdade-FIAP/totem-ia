@@ -66,7 +66,6 @@ htmlcov/
 # Models (heavy files)
 *.h5
 *.hdf5
-*.pkl
 *.pth
 *.onnx
 models/*.bin
