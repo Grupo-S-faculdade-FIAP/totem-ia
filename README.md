@@ -357,7 +357,6 @@ totem-ia/
 
 - **Caroline**: Líder Técnico & Backend Developer
 - **Equipe FIAP**: Desenvolvimento colaborativo
-- **Orientação**: Tutora Ana Cristina dos Santos
 
 ---
 
@@ -370,8 +369,6 @@ Este projeto é parte do Challenge FlexMedia - FIAP. Todos os direitos reservado
 ## 🎯 Contato
 
 **Repositório GitHub**: [Grupo-S-faculdade-FIAP/totem-ia](https://github.com/Grupo-S-faculdade-FIAP/totem-ia)
-
-**Tutora**: Ana Cristina dos Santos (@anacrissantos)
 
 ---
 
