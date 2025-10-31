@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste de Áudio</title>
+</head>
+<body>
+    <h1>Teste de Áudio TOTEM</h1>
+    
+    <p>Status: <span id="status">Carregando...</span></p>
+    
+    <audio id="testAudio" controls crossorigin="anonymous">
+        <source src="/api/speech/sustainability" type="audio/wav">
+        Seu navegador não suporta áudio HTML5.
+    </audio>
+    
+    <hr>
+    
+    <h2>Debug Info:</h2>
+    <pre id="debug"></pre>
+    
+    <script>
+        const audio = document.getElementById('testAudio');
+        const status = document.getElementById('status');
+        const debug = document.getElementById('debug');
+        
+        function log(msg) {
+            console.log(msg);
+            debug.textContent += msg + '\n';
+        }
+        
+        log('Página carregada');
+        log('Audio element: ' + (audio ? 'OK' : 'FALHOU'));
+        
+        audio.addEventListener('loadstart', () => {
+            log('✅ loadstart');
+            status.textContent = 'Carregando...';
+        });
+        
+        audio.addEventListener('canplay', () => {
+            log('✅ canplay - duração: ' + audio.duration + 's');
+            status.textContent = 'Pronto para reproduzir';
+        });
+        
+        audio.addEventListener('play', () => {
+            log('✅ play');
+            status.textContent = 'Reproduzindo...';
+        });
+        
+        audio.addEventListener('pause', () => {
+            log('⏸️ pause');
+            status.textContent = 'Pausado';
+        });
+        
+        audio.addEventListener('ended', () => {
+            log('✅ ended');
+            status.textContent = 'Terminado';
+        });
+        
+        audio.addEventListener('error', (e) => {
+            log('❌ error: ' + audio.error?.message);
+            log('Error code: ' + audio.error?.code);
+            status.textContent = 'ERRO ao carregar áudio';
+        });
+        
+        audio.addEventListener('loadedmetadata', () => {
+            log('✅ loadedmetadata - duração: ' + audio.duration + 's');
+        });
+        
+        log('Iniciando carregamento...');
+        audio.load();
+    </script>
+</body>
+</html>

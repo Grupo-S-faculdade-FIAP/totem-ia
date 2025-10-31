@@ -5,6 +5,8 @@ TOTEM IA - API Flask para Classificação de Tampinhas
 
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
+import cv2
+import numpy as np
 import base64
 import io
 import joblib
@@ -61,7 +63,19 @@ MODEL, SCALER = load_classifier()
 # FUNÇÃO DE EXTRAÇÃO DE FEATURES
 def extract_color_features(image):
     try:
+        logger.debug(f"🔍 extract_color_features iniciada. Image type: {type(image)}, shape: {image.shape if hasattr(image, 'shape') else 'N/A'}")
+        
+        if not isinstance(image, np.ndarray):
+            logger.error(f"❌ Imagem não é numpy array! Tipo: {type(image)}")
+            return None
+        
+        # Verificar cv2
+        if 'cv2' not in globals():
+            logger.error("❌ cv2 não está em globals()")
+            return None
+            
         image = cv2.resize(image, (128, 128))
+        logger.debug(f"✅ Imagem redimensionada para 128x128")
 
         features = []
 
@@ -115,15 +129,27 @@ def extract_color_features(image):
 
 def classify_image(image):
     if image is None or MODEL is None or SCALER is None:
+        logger.error(f"⚠️ Prerequisitos faltando: image={image is not None}, MODEL={MODEL is not None}, SCALER={SCALER is not None}")
         return None, None, None, "ERRO"
 
     try:
+        logger.info(f"📸 Iniciando classificação. Imagem shape: {image.shape if image is not None else 'None'}")
+        
+        # Verificar se cv2 está disponível
+        if not hasattr(cv2, 'cvtColor'):
+            logger.error("❌ ERRO CRÍTICO: cv2 módulo não está completo!")
+            return None, None, None, "ERRO"
+        
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         saturation = np.mean(hsv[:, :, 1])
+        logger.info(f"✅ HSV convertido. Saturação: {saturation:.1f}")
 
         features = extract_color_features(image)
         if features is None or np.isnan(features).any():
+            logger.error("❌ Erro ao extrair features")
             return None, None, saturation, "ERRO"
+        
+        logger.info(f"✅ Features extraídas. Shape: {features.shape}")
 
         features_scaled = SCALER.transform([features])
 
@@ -188,9 +214,6 @@ def rewards():
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
-    import cv2
-    import numpy as np
-    
     try:
         image = None
 
@@ -266,8 +289,10 @@ def api_classify():
         return jsonify(response), 200
 
     except Exception as e:
+        import traceback
         logger.error(f"Erro no endpoint /classify: {e}")
-        return jsonify({'error': str(e), 'status': 'erro'}), 500
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'error': str(e), 'status': 'erro', 'traceback': traceback.format_exc()}, 500)
 
 @app.route('/api/health', methods=['GET'])
 def health():
@@ -289,46 +314,39 @@ def generate_sustainability_speech(use_cache=True):
     audio_dir = Path('static/audio')
     audio_dir.mkdir(parents=True, exist_ok=True)
     
-    # Arquivo final pré-gerado com o script completo (~55 segundos)
-    final_audio = audio_dir / 'sustainability_speech_final.wav'
-    cache_audio = audio_dir / 'sustainability_speech.wav'
+    # Arquivo único de áudio pré-gerado com o script completo (~55 segundos)
+    audio_file = audio_dir / 'sustainability_speech.wav'
     
-    # Se arquivo final pré-gerado existe, usar ele
-    if final_audio.exists():
+    # Se arquivo existe, usar ele
+    if audio_file.exists():
         logger.info("✅ Usando áudio pré-gerado completo (55s)")
-        # SEMPRE copiar o arquivo final (garante que está atualizado)
-        import shutil
-        shutil.copy(str(final_audio), str(cache_audio))
-        return str(cache_audio)
+        return str(audio_file)
     
-    # Se cache existe, usar
-    if use_cache and cache_audio.exists():
-        logger.info("✅ Usando áudio em cache")
-        return str(cache_audio)
-    
-    logger.warning("⚠️ Nenhum áudio pré-gerado encontrado!")
-    logger.info("💡 Execute: python3 generate_final_audio.py")
-    
-    # Fallback: retornar arquivo placeholder/silêncio
-    try:
-        import wave
-        import struct
-        logger.warning("⚠️ Criando arquivo WAV de silêncio como placeholder...")
-        sample_rate = 16000
-        duration = 2
-        num_samples = sample_rate * duration
+    # Se não existe, criar placeholder
+    if not audio_file.exists():
+        logger.warning("⚠️ Nenhum áudio pré-gerado encontrado!")
+        logger.info("💡 Áudio esperado em: static/audio/sustainability_speech.wav")
         
-        with wave.open(str(cache_audio), 'w') as wav_file:
-            wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(sample_rate)
-            for _ in range(num_samples):
-                wav_file.writeframes(struct.pack('<h', 0))
-        
-        return str(cache_audio)
-    except Exception as e:
-        logger.error(f"❌ Erro ao criar placeholder: {e}")
-        return None
+        # Criar arquivo silencioso como fallback
+        try:
+            import wave
+            import struct
+            logger.warning("⚠️ Criando arquivo WAV de silêncio como placeholder...")
+            sample_rate = 16000
+            duration = 2
+            num_samples = sample_rate * duration
+            
+            with wave.open(str(audio_file), 'w') as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(sample_rate)
+                for _ in range(num_samples):
+                    wav_file.writeframes(struct.pack('<h', 0))
+        except Exception as e:
+            logger.error(f"❌ Erro ao criar placeholder: {e}")
+            return None
+    
+    return str(audio_file)
 
 @app.route('/api/speech/sustainability', methods=['GET'])
 def get_sustainability_speech():
@@ -336,30 +354,47 @@ def get_sustainability_speech():
     Retorna o arquivo de áudio sobre sustentabilidade
     """
     try:
-        # Sempre regenerar para garantir conteúdo atualizado
-        audio_file = generate_sustainability_speech(use_cache=False)
+        logger.debug(f"🎵 Requisição de áudio recebida. Cache: {request.args.get('t', 'N/A')}")
+        
+        # Usar cache quando disponível
+        audio_file = generate_sustainability_speech(use_cache=True)
         
         if audio_file and Path(audio_file).exists():
-            file_ext = Path(audio_file).suffix.lower()
+            file_path = Path(audio_file)
+            file_size = file_path.stat().st_size
             
-            # Detectar tipo MIME baseado na extensão
+            logger.info(f"📤 Servindo áudio: {audio_file} ({file_size} bytes)")
+            
+            # Determinar tipo MIME
+            file_ext = file_path.suffix.lower()
             if file_ext == '.wav':
                 mimetype = 'audio/wav'
             elif file_ext == '.mp3':
                 mimetype = 'audio/mpeg'
             else:
-                mimetype = 'audio/mpeg'  # padrão
+                mimetype = 'audio/wav'  # padrão
             
-            return send_file(
-                audio_file,
+            # Usar send_file com range support
+            response = send_file(
+                str(file_path),
                 mimetype=mimetype,
-                as_attachment=False
+                as_attachment=False,
+                download_name='sustainability_speech.wav'
             )
+            
+            # Adicionar headers para streaming
+            response.headers['Accept-Ranges'] = 'bytes'
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            
+            logger.info(f"✅ Áudio servido com sucesso")
+            return response
         else:
+            logger.error(f"❌ Arquivo de áudio não encontrado: {audio_file}")
             return jsonify({'error': 'Arquivo de áudio não disponível'}), 500
             
     except Exception as e:
-        logger.error(f"Erro ao servir áudio: {e}")
+        logger.error(f"❌ Erro ao servir áudio: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/speech/info', methods=['GET'])
