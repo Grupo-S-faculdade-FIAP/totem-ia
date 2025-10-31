@@ -402,7 +402,7 @@ if __name__ == '__main__':
     print()
 
     try:
-        app.run(host='0.0.0.0', port=5003, debug=False, use_reloader=False)
+        app.run(host='0.0.0.0', port=5005, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         print("\nServidor interrompido pelo usuario.")
     except Exception as e:
