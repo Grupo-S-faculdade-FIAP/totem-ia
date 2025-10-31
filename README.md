@@ -35,6 +35,8 @@ Desenvolvemos uma solução inovadora de **totem inteligente para depósito de t
 - **Integração multissensorial** (câmera, display, áudio)
 - **Dashboard em nuvem** para análise de dados
 
+> 📖 **Leia nossa história completa**: [STORYTELLING.md](STORYTELLING.md) - A jornada de inovação sustentável do TOTEM IA
+
 ---
 
 ## 🎯 Objetivos da Sprint 1
