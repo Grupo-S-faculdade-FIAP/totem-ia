@@ -5,8 +5,6 @@ TOTEM IA - API Flask para Classificação de Tampinhas
 
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
-import cv2
-import numpy as np
 import base64
 import io
 import joblib
@@ -190,6 +188,9 @@ def rewards():
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
+    import cv2
+    import numpy as np
+    
     try:
         image = None
 
