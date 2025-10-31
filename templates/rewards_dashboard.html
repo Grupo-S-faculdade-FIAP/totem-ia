@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTEM IA - Dashboard de Pontos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        /* Points Card */
+        .points-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            margin-bottom: 30px;
+            text-align: center;
+            animation: slideUp 0.5s ease-out 0.1s both;
+        }
+
+        .points-card.loading {
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f0f0f0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .points-amount {
+            font-size: 64px;
+            font-weight: 800;
+            color: #667eea;
+            margin: 20px 0;
+            text-shadow: 0 4px 10px rgba(102, 126, 234, 0.2);
+        }
+
+        .points-label {
+            font-size: 18px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+
+        .user-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .stat-box.caps {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .stat-icon {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+            text-transform: uppercase;
+        }
+
+        /* Partners Section */
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .partners-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .partner-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            animation: slideUp 0.5s ease-out both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .partner-card:nth-child(1) { animation-delay: 0.1s; }
+        .partner-card:nth-child(2) { animation-delay: 0.15s; }
+        .partner-card:nth-child(3) { animation-delay: 0.2s; }
+        .partner-card:nth-child(4) { animation-delay: 0.25s; }
+        .partner-card:nth-child(5) { animation-delay: 0.3s; }
+        .partner-card:nth-child(6) { animation-delay: 0.35s; }
+
+        .partner-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--partner-color, #667eea);
+        }
+
+        .partner-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .partner-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .partner-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .partner-description {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            min-height: 40px;
+        }
+
+        .partner-points {
+            font-size: 18px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .redeem-button {
+            width: 100%;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .redeem-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .redeem-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        .redeem-button.redeemed {
+            background: #4CAF50;
+            cursor: default;
+        }
+
+        .redeem-button.insufficient {
+            background: #f44336;
+        }
+
+        /* Leaderboard */
+        .leaderboard-table {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.5s ease-out 0.2s both;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        th {
+            padding: 20px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            font-weight: 700;
+            margin-right: 10px;
+        }
+
+        .rank-1 {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            box-shadow: 0 4px 10px rgba(255, 215, 0, 0.4);
+        }
+
+        .rank-2 {
+            background: linear-gradient(135deg, #C0C0C0 0%, #808080 100%);
+        }
+
+        .rank-3 {
+            background: linear-gradient(135deg, #CD7F32 0%, #8B4513 100%);
+        }
+
+        .user-row {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .user-points {
+            font-weight: 700;
+            color: #667eea;
+            font-size: 18px;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s ease-out;
+            text-align: center;
+        }
+
+        .modal-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .modal-message {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .modal-btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .points-amount {
+                font-size: 48px;
+            }
+
+            .partners-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section-title {
+                font-size: 20px;
+            }
+
+            table {
+                font-size: 14px;
+            }
+
+            th, td {
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎮 Dashboard de Pontos TAMPS</h1>
+            <p>Resgate suas recompensas</p>
+        </div>
+
+        <!-- Points Card -->
+        <div class="points-card loading" id="pointsCard">
+            <div class="loading-spinner"></div>
+        </div>
+
+        <!-- Partners Section -->
+        <div class="section">
+            <h2 class="section-title">
+                <i class="fas fa-store"></i>
+                Parceiros Disponíveis
+            </h2>
+            <div class="partners-grid" id="partnersGrid"></div>
+        </div>
+
+        <!-- Leaderboard Section -->
+        <div class="section">
+            <h2 class="section-title">
+                <i class="fas fa-trophy"></i>
+                Ranking Top 10
+            </h2>
+            <div class="leaderboard-table">
+                <table id="leaderboardTable">
+                    <thead>
+                        <tr>
+                            <th>Posição</th>
+                            <th>Usuário</th>
+                            <th>⭐ Pontos</th>
+                            <th>♻️ Tampinhas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Redeem Modal -->
+    <div class="modal" id="redeemModal">
+        <div class="modal-content">
+            <div class="modal-icon" id="modalIcon">✓</div>
+            <div class="modal-title" id="modalTitle">Resgate Confirmado</div>
+            <div class="modal-message" id="modalMessage">
+                Parabéns! Você resgatou a recompensa com sucesso.
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-primary" onclick="closeModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const userId = localStorage.getItem('totem_user_id') || 'guest';
+        const BASE_URL = '';
+
+        // Load user data
+        async function loadUserData() {
+            try {
+                const response = await fetch(`${BASE_URL}/api/rewards/user/${userId}`);
+                const userData = await response.json();
+                displayUserData(userData);
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+            }
+        }
+
+        function displayUserData(userData) {
+            const card = document.getElementById('pointsCard');
+            card.classList.remove('loading');
+            card.innerHTML = `
+                <div class="points-label">Seus Pontos</div>
+                <div class="points-amount">${userData.total_points} TAMPS</div>
+                <div class="user-stats">
+                    <div class="stat-box caps">
+                        <div class="stat-icon">♻️</div>
+                        <div class="stat-value">${userData.caps_deposited}</div>
+                        <div class="stat-label">Tampinhas</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-icon">📅</div>
+                        <div class="stat-value">${new Date(userData.created_at).toLocaleDateString('pt-BR')}</div>
+                        <div class="stat-label">Membro Desde</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load partners
+        async function loadPartners() {
+            try {
+                const response = await fetch(`${BASE_URL}/api/rewards/partners`);
+                const data = await response.json();
+                displayPartners(data.partners);
+            } catch (error) {
+                console.error('Erro ao carregar parceiros:', error);
+            }
+        }
+
+        function displayPartners(partners) {
+            const grid = document.getElementById('partnersGrid');
+            grid.innerHTML = partners.map(partner => `
+                <div class="partner-card" style="--partner-color: ${partner.color}">
+                    <div class="partner-icon">${partner.icon}</div>
+                    <div class="partner-name">${partner.name}</div>
+                    <div class="partner-description">${partner.description}</div>
+                    <div class="partner-points">${partner.points_required} TAMPS</div>
+                    <button 
+                        class="redeem-button" 
+                        onclick="redeemReward('${partner.id}', '${partner.name}', ${partner.points_required})"
+                    >
+                        Resgatar
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // Redeem reward
+        async function redeemReward(partnerId, partnerName, pointsRequired) {
+            try {
+                const response = await fetch(`${BASE_URL}/api/rewards/redeem`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, partner_id: partnerId })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showRedeemModal(true, partnerName, result.remaining_points);
+                    loadUserData(); // Atualizar dados
+                } else {
+                    showRedeemModal(false, result.error);
+                }
+            } catch (error) {
+                console.error('Erro ao resgatar:', error);
+                showRedeemModal(false, 'Erro ao processar resgate');
+            }
+        }
+
+        function showRedeemModal(success, title, message) {
+            const modal = document.getElementById('redeemModal');
+            const icon = document.getElementById('modalIcon');
+            const titleEl = document.getElementById('modalTitle');
+            const messageEl = document.getElementById('modalMessage');
+
+            if (success) {
+                icon.textContent = '✓';
+                icon.style.color = '#4CAF50';
+                titleEl.textContent = 'Resgate Confirmado!';
+                messageEl.textContent = `${title}\n✅ Pontos restantes: ${message} TAMPS`;
+            } else {
+                icon.textContent = '✕';
+                icon.style.color = '#f44336';
+                titleEl.textContent = 'Erro no Resgate';
+                messageEl.textContent = title;
+            }
+
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('redeemModal').classList.remove('show');
+        }
+
+        // Load leaderboard
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch(`${BASE_URL}/api/rewards/leaderboard?limit=10`);
+                const data = await response.json();
+                displayLeaderboard(data.leaderboard);
+            } catch (error) {
+                console.error('Erro ao carregar ranking:', error);
+            }
+        }
+
+        function displayLeaderboard(users) {
+            const tbody = document.getElementById('leaderboardBody');
+            tbody.innerHTML = users.map((user, idx) => {
+                const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : '';
+                return `
+                    <tr>
+                        <td>
+                            <div class="rank-badge ${rankClass}">${idx + 1}</div>
+                        </td>
+                        <td>
+                            <div class="user-name">${user.id.replace('test_user_', '👤 ')}</div>
+                        </td>
+                        <td>
+                            <div class="user-points">⭐ ${user.total_points}</div>
+                        </td>
+                        <td>${user.caps_deposited} ♻️</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            loadUserData();
+            loadPartners();
+            loadLeaderboard();
+        });
+
+        // Refresh data a cada 30 segundos
+        setInterval(() => {
+            loadUserData();
+            loadLeaderboard();
+        }, 30000);
+    </script>
+</body>
+</html>

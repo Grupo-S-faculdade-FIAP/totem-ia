@@ -21,6 +21,9 @@ import requests
 # Importar agents e prompts
 from prompts.agents_config import get_agent
 
+# Importar sistema de recompensas
+from src.rewards_system import get_rewards_system
+
 # Carregar variáveis de ambiente
 load_dotenv()
 
@@ -173,6 +176,16 @@ def totem_intro():
 def totem_v2():
     return render_template('totem_v2.html', v=1)
 
+@app.route('/processing')
+def processing():
+    """Tela de processamento e confirmação de tampinha"""
+    return render_template('processing.html', v=1)
+
+@app.route('/rewards')
+def rewards():
+    """Dashboard de recompensas e pontos"""
+    return render_template('rewards_dashboard.html', v=1)
+
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
     try:
@@ -268,159 +281,50 @@ def health():
 
 def generate_sustainability_speech(use_cache=True):
     """
-    Gera arquivo de áudio sobre sustentabilidade usando OpenAI e Hugging Face
+    Retorna arquivo de áudio sobre sustentabilidade (pré-gerado)
     """
     audio_dir = Path('static/audio')
     audio_dir.mkdir(parents=True, exist_ok=True)
-    audio_file = audio_dir / 'sustainability_speech.wav'
     
-    # Usar cache se arquivo já existe
-    if use_cache and audio_file.exists():
+    # Arquivo final pré-gerado com o script completo (~55 segundos)
+    final_audio = audio_dir / 'sustainability_speech_final.wav'
+    cache_audio = audio_dir / 'sustainability_speech.wav'
+    
+    # Se arquivo final pré-gerado existe, usar ele
+    if final_audio.exists():
+        logger.info("✅ Usando áudio pré-gerado completo (55s)")
+        # SEMPRE copiar o arquivo final (garante que está atualizado)
+        import shutil
+        shutil.copy(str(final_audio), str(cache_audio))
+        return str(cache_audio)
+    
+    # Se cache existe, usar
+    if use_cache and cache_audio.exists():
         logger.info("✅ Usando áudio em cache")
-        return str(audio_file)
+        return str(cache_audio)
     
+    logger.warning("⚠️ Nenhum áudio pré-gerado encontrado!")
+    logger.info("💡 Execute: python3 generate_final_audio.py")
+    
+    # Fallback: retornar arquivo placeholder/silêncio
     try:
-        # 1. Gerar script com OpenAI usando agent de sustentabilidade
-        logger.info("🤖 Gerando script de sustentabilidade com OpenAI...")
-        
-        # Obter configuração do agent de sustentabilidade
-        agent = get_agent("sustainability")
-        system_prompt = agent["system_prompt"]
-        user_prompt = agent["user_prompt"]
-        config = agent["config"]
-        
-        logger.info(f"📋 Usando agent: {agent['metadata']['name']}")
-        
-        response = openai.ChatCompletion.create(
-            model=config["model"],
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {
-                    "role": "user",
-                    "content": user_prompt
-                }
-            ],
-            temperature=config["temperature"],
-            max_tokens=config["max_tokens"]
-        )
-        
-        script = response.choices[0].message.content.strip()
-        logger.info(f"✅ Script gerado!")
-        
-        # 2. Sintetizar fala com Hugging Face (PRIMEIRA TENTATIVA)
-        logger.info("🎙️ Tentando Hugging Face para síntese de fala...")
-        
-        api_url = "https://api-inference.huggingface.co/models/espnet/kan-bayashi_ljspeech_glow-tts"
-        headers = {"Authorization": f"Bearer {hf_token}"}
-        
-        payload = {"inputs": script}
-        
-        try:
-            tts_response = requests.post(api_url, headers=headers, json=payload, timeout=30)
-            
-            if tts_response.status_code == 200:
-                with open(audio_file, 'wb') as f:
-                    f.write(tts_response.content)
-                logger.info(f"✅ Áudio sintetizado com Hugging Face!")
-                return str(audio_file)
-            else:
-                logger.warning(f"⚠️ Hugging Face retornou status {tts_response.status_code}")
-                
-        except requests.exceptions.Timeout:
-            logger.warning("⚠️ Timeout no Hugging Face")
-        except Exception as e:
-            logger.warning(f"⚠️ Erro no Hugging Face: {e}")
-        
-        # 3. Fallback para pyttsx3 (LOCAL TEXT-TO-SPEECH)
-        logger.info("🎙️ Usando pyttsx3 para síntese de fala local...")
-        
-        try:
-            import pyttsx3
-            import os
-            import time
-            
-            # Inicializar engine
-            engine = pyttsx3.init()
-            
-            # Configurar propriedades
-            engine.setProperty('rate', 120)  # velocidade
-            engine.setProperty('volume', 0.9)  # volume
-            
-            # Salvar diretamente para arquivo
-            logger.info(f"🔍 Salvando áudio com pyttsx3...")
-            temp_aiff = str(audio_dir / 'temp_audio.aiff')
-            
-            engine.save_to_file(script, temp_aiff)
-            engine.runAndWait()
-            
-            # Aguardar para garantir que o arquivo está completo
-            time.sleep(2)
-            
-            logger.info(f"🔍 Verificando arquivo temporário: {temp_aiff}")
-            if os.path.exists(temp_aiff) and os.path.getsize(temp_aiff) > 2000:
-                logger.info(f"🔍 Arquivo AIFF criado com {os.path.getsize(temp_aiff)} bytes")
-                
-                # Converter AIFF para WAV
-                try:
-                    import soundfile as sf
-                    logger.info(f"🔍 Lendo AIFF...")
-                    data, sr = sf.read(temp_aiff)
-                    logger.info(f"🔍 Shape: {data.shape}, Taxa: {sr} Hz")
-                    
-                    logger.info(f"🔍 Escrevendo WAV...")
-                    sf.write(str(audio_file), data, sr, subtype='PCM_16')
-                    file_size = Path(audio_file).stat().st_size
-                    logger.info(f"✅ Áudio convertido! Tamanho: {file_size} bytes")
-                    
-                    # Limpezação
-                    if os.path.exists(temp_aiff):
-                        os.remove(temp_aiff)
-                    
-                    return str(audio_file)
-                    
-                except Exception as convert_err:
-                    logger.error(f"❌ Erro na conversão AIFF→WAV: {convert_err}")
-                    import traceback
-                    traceback.print_exc()
-            else:
-                logger.warning(f"⚠️ Arquivo AIFF não criado ou vazio: {os.path.getsize(temp_aiff) if os.path.exists(temp_aiff) else 'não existe'}")
-                
-        except Exception as e:
-            logger.error(f"❌ Erro com pyttsx3: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        # 4. Fallback final - criar arquivo placeholder
-        logger.warning("⚠️ Nenhum TTS funcionou, criando placeholder...")
-        
-        # Criar arquivo WAV mínimo válido com silence
         import wave
         import struct
-        
-        # Parâmetros de áudio
+        logger.warning("⚠️ Criando arquivo WAV de silêncio como placeholder...")
         sample_rate = 16000
-        duration = 2  # 2 segundos de silêncio
+        duration = 2
         num_samples = sample_rate * duration
         
-        with wave.open(str(audio_file), 'w') as wav_file:
-            wav_file.setnchannels(1)  # mono
-            wav_file.setsampwidth(2)  # 16-bit
+        with wave.open(str(cache_audio), 'w') as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
             wav_file.setframerate(sample_rate)
-            
-            # Escrever silêncio (zeros)
             for _ in range(num_samples):
                 wav_file.writeframes(struct.pack('<h', 0))
         
-        logger.info("⚠️ Arquivo WAV placeholder criado")
-        return str(audio_file)
-        
+        return str(cache_audio)
     except Exception as e:
-        logger.error(f"❌ Erro ao gerar áudio: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"❌ Erro ao criar placeholder: {e}")
         return None
 
 @app.route('/api/speech/sustainability', methods=['GET'])
@@ -429,7 +333,8 @@ def get_sustainability_speech():
     Retorna o arquivo de áudio sobre sustentabilidade
     """
     try:
-        audio_file = generate_sustainability_speech()
+        # Sempre regenerar para garantir conteúdo atualizado
+        audio_file = generate_sustainability_speech(use_cache=False)
         
         if audio_file and Path(audio_file).exists():
             file_ext = Path(audio_file).suffix.lower()
@@ -470,7 +375,129 @@ def get_speech_info():
         
         return jsonify(info)
     except Exception as e:
-        logger.error(f"Erro ao obter info de áudio: {e}")
+        logger.error(f"Erro ao obter informações do áudio: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ==============================================================================
+# SISTEMA DE RECOMPENSAS - TAMPS
+# ==============================================================================
+
+@app.route('/api/rewards/add-cap', methods=['POST'])
+def api_add_cap():
+    """
+    Adiciona uma tampinha e concede pontos ao usuário
+    Body: { user_id: string, points?: number (default 10), cap_type?: string }
+    """
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'user_id é obrigatório'}), 400
+        
+        points = int(data.get('points', 10))
+        cap_type = data.get('cap_type', 'plastic')
+        
+        rewards = get_rewards_system()
+        user_data = rewards.add_cap(user_id, points=points, cap_type=cap_type)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Tampinha adicionada! +{points} TAMPS',
+            'points_awarded': points,
+            'user_data': user_data
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Erro ao adicionar tampinha: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rewards/user/<user_id>', methods=['GET'])
+def api_get_user(user_id):
+    """
+    Obtém dados do usuário (pontos totais, tampinhas depositadas, etc)
+    """
+    try:
+        rewards = get_rewards_system()
+        user_data = rewards.get_user_data(user_id)
+        
+        if not user_data:
+            return jsonify({
+                'id': user_id,
+                'total_points': 0,
+                'caps_deposited': 0,
+                'created_at': datetime.now().isoformat()
+            }), 200
+        
+        return jsonify(user_data), 200
+    
+    except Exception as e:
+        logger.error(f"Erro ao obter dados do usuário: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rewards/partners', methods=['GET'])
+def api_get_partners():
+    """
+    Retorna lista de parceiros disponíveis para resgate
+    """
+    try:
+        rewards = get_rewards_system()
+        partners = rewards.get_partners()
+        
+        return jsonify({
+            'partners': partners,
+            'count': len(partners)
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Erro ao obter parceiros: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rewards/redeem', methods=['POST'])
+def api_redeem_reward():
+    """
+    Resgata uma recompensa usando pontos
+    Body: { user_id: string, partner_id: string }
+    """
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        partner_id = data.get('partner_id')
+        
+        if not user_id or not partner_id:
+            return jsonify({'error': 'user_id e partner_id são obrigatórios'}), 400
+        
+        rewards = get_rewards_system()
+        result = rewards.redeem_reward(user_id, partner_id)
+        
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 200
+    
+    except Exception as e:
+        logger.error(f"Erro ao resgatar recompensa: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rewards/leaderboard', methods=['GET'])
+def api_get_leaderboard():
+    """
+    Retorna o ranking dos top usuários por pontos
+    Query param: limit (default 10)
+    """
+    try:
+        limit = int(request.args.get('limit', 10))
+        
+        rewards = get_rewards_system()
+        leaderboard = rewards.get_leaderboard(limit=limit)
+        
+        return jsonify({
+            'leaderboard': leaderboard,
+            'count': len(leaderboard)
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Erro ao obter ranking: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

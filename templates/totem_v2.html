@@ -758,6 +758,78 @@
         let capturedImage = null;
         let startTime = null;
 
+        // ===== SISTEMA DE RECOMPENSAS =====
+        class RewardsManager {
+            constructor() {
+                this.userId = this.getOrCreateUserId();
+                this.userData = null;
+                this.loadUserData();
+            }
+
+            getOrCreateUserId() {
+                let userId = localStorage.getItem('totem_user_id');
+                if (!userId) {
+                    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('totem_user_id', userId);
+                }
+                return userId;
+            }
+
+            async loadUserData() {
+                try {
+                    const response = await fetch(`/api/rewards/user/${this.userId}`);
+                    this.userData = await response.json();
+                    this.updateUIWithUserData();
+                } catch (error) {
+                    console.error('Erro ao carregar dados do usuário:', error);
+                    this.userData = { id: this.userId, total_points: 0, caps_deposited: 0 };
+                }
+            }
+
+            async addCap(points = 10) {
+                try {
+                    const response = await fetch('/api/rewards/add-cap', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: this.userId,
+                            points: points,
+                            cap_type: 'plastic'
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.userData = data.user_data;
+                        this.updateUIWithUserData();
+                        return data;
+                    }
+                } catch (error) {
+                    console.error('Erro ao adicionar tampinha:', error);
+                }
+                return null;
+            }
+
+            updateUIWithUserData() {
+                if (this.userData) {
+                    console.log('👤 Usuário:', this.userData.id);
+                    console.log('⭐ Pontos:', this.userData.total_points);
+                    console.log('♻️ Tampinhas:', this.userData.caps_deposited);
+                }
+            }
+
+            redirectToProcessing(pointsAwarded) {
+                const params = new URLSearchParams({
+                    points: pointsAwarded,
+                    total: this.userData.total_points,
+                    caps: this.userData.caps_deposited
+                });
+                window.location.href = `/processing?${params.toString()}`;
+            }
+        }
+
+        const rewards = new RewardsManager();
+
         // START CAMERA
         startCameraBtn.addEventListener('click', initializeCamera);
 
@@ -875,14 +947,29 @@
             if (isSucesso) {
                 document.getElementById('ledSucesso').classList.add('active');
                 playSound('success');
-                showInfo('Tampinha aceita com sucesso! Depositada na esteira.', 'success');
+                showInfo('Tampinha aceita com sucesso! Processando...', 'success');
+                
+                // 🎯 INTEGRAÇÃO COM SISTEMA DE RECOMPENSAS
+                // Adicionar tampinha ao sistema e redirecionar para tela de processamento
+                (async () => {
+                    const pointsAwarded = 10;
+                    await rewards.addCap(pointsAwarded);
+                    
+                    // Redirecionar para tela de processamento (3 segundos de animação)
+                    setTimeout(() => {
+                        rewards.redirectToProcessing(pointsAwarded);
+                    }, 500);
+                })();
             } else {
                 document.getElementById('ledErro').classList.add('active');
                 playSound('error');
                 showInfo('Item rejeitado. Apenas tampinhas sao aceitas!', 'error');
+                resultado.classList.add('show');
             }
 
-            resultado.classList.add('show');
+            if (!isSucesso) {
+                resultado.classList.add('show');
+            }
         }
 
         function showError(message) {

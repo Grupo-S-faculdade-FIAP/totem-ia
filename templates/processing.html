@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTEM IA - Processando</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .processing-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            padding: 40px;
+        }
+
+        /* Processing Animation - 3 seconds */
+        .processing-screen {
+            background: white;
+            border-radius: 30px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .processing-spinner {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 30px;
+            position: relative;
+            animation: spin 3s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner-ring {
+            width: 100%;
+            height: 100%;
+            border: 8px solid #f0f0f0;
+            border-top-color: #667eea;
+            border-right-color: #764ba2;
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .spinner-ring::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            opacity: 0.1;
+        }
+
+        .processing-text {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            animation: pulse-text 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-text {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.6;
+            }
+        }
+
+        .processing-dots {
+            font-size: 24px;
+            letter-spacing: 4px;
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% {
+                content: '.';
+            }
+            40% {
+                content: '..';
+            }
+            60% {
+                content: '...';
+            }
+            100% {
+                content: '';
+            }
+        }
+
+        .processing-subtitle {
+            font-size: 14px;
+            color: #999;
+            margin-top: 15px;
+        }
+
+        /* Success Screen */
+        .success-screen {
+            display: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 30px;
+            padding: 60px 40px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.5s ease-out;
+            color: white;
+        }
+
+        .success-screen.show {
+            display: block;
+        }
+
+        .success-icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 30px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 60px;
+            animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            color: #4CAF50;
+        }
+
+        @keyframes bounce-in {
+            0% {
+                transform: scale(0);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .success-text {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            animation: slideUp 0.6s ease-out 0.2s both;
+        }
+
+        .points-award {
+            font-size: 48px;
+            font-weight: 800;
+            color: #FFD700;
+            margin: 20px 0;
+            animation: popIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s both;
+            text-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        @keyframes popIn {
+            0% {
+                transform: scale(0) rotate(-20deg);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.15) rotate(5deg);
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .points-text {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.9);
+            margin: 20px 0 40px;
+        }
+
+        .user-stats {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 20px;
+            margin: 30px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+        }
+
+        .stat {
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-top: 8px;
+        }
+
+        .continue-button {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 40px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 30px;
+            transition: all 0.3s ease;
+            animation: slideUp 0.6s ease-out 0.5s both;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .continue-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .continue-button:active {
+            transform: translateY(-1px);
+        }
+
+        /* Floatie particles animation */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) translateX(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100vh) translateX(100px);
+                opacity: 0;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .processing-container {
+                padding: 20px;
+            }
+
+            .processing-screen,
+            .success-screen {
+                padding: 40px 20px;
+            }
+
+            .processing-text {
+                font-size: 20px;
+            }
+
+            .success-text {
+                font-size: 24px;
+            }
+
+            .points-award {
+                font-size: 40px;
+            }
+
+            .stat-value {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="particles" id="particles"></div>
+
+    <div class="processing-container">
+        <!-- Processing Screen -->
+        <div class="processing-screen" id="processingScreen">
+            <div class="processing-spinner">
+                <div class="spinner-ring"></div>
+            </div>
+            <div class="processing-text">
+                Processando<span class="processing-dots"></span>
+            </div>
+            <div class="processing-subtitle">
+                Analisando sua tampinha...
+            </div>
+        </div>
+
+        <!-- Success Screen -->
+        <div class="success-screen" id="successScreen">
+            <div class="success-icon">
+                <i class="fas fa-check"></i>
+            </div>
+            <div class="success-text">Tampinha Aceita! ✓</div>
+            
+            <div class="points-award" id="pointsAward">+10 TAMPS</div>
+            <div class="points-text">Parabéns! Você ganhou pontos</div>
+
+            <div class="user-stats">
+                <div class="stat-row">
+                    <div class="stat">
+                        <div class="stat-label">Pontos Totais</div>
+                        <div class="stat-value" id="totalPoints">10</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">Tampinhas</div>
+                        <div class="stat-value" id="capsCount">1</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="continue-button" onclick="continueFlow()">
+                Continuar <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Gerar partículas flutuantes
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.width = Math.random() * 10 + 5 + 'px';
+                particle.style.height = particle.style.width;
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.bottom = '-20px';
+                particle.style.animationDelay = Math.random() * 2 + 's';
+                particle.style.animationDuration = (Math.random() * 4 + 4) + 's';
+                container.appendChild(particle);
+            }
+        }
+
+        // Inicializar
+        createParticles();
+
+        // Simular processamento
+        function startProcessing(pointsAwarded = 10, totalPoints = 10, capsCount = 1) {
+            setTimeout(() => {
+                const processingScreen = document.getElementById('processingScreen');
+                const successScreen = document.getElementById('successScreen');
+                
+                processingScreen.style.display = 'none';
+                successScreen.classList.add('show');
+                
+                // Atualizar dados
+                document.getElementById('pointsAward').textContent = `+${pointsAwarded} TAMPS`;
+                document.getElementById('totalPoints').textContent = totalPoints;
+                document.getElementById('capsCount').textContent = capsCount;
+                
+            }, 3000); // 3 segundos de processamento
+        }
+
+        // Continuar fluxo
+        function continueFlow() {
+            // Aqui você pode redirecionar para a câmera ou próxima tela
+            console.log('Continuando fluxo...');
+            // Exemplo:
+            // window.location.href = '/totem_v2.html';
+        }
+
+        // Iniciar processamento quando página carregar
+        window.addEventListener('load', () => {
+            // Dados vêm da URL ou de uma API
+            const urlParams = new URLSearchParams(window.location.search);
+            const pointsAwarded = parseInt(urlParams.get('points')) || 10;
+            const totalPoints = parseInt(urlParams.get('total')) || 10;
+            const capsCount = parseInt(urlParams.get('caps')) || 1;
+            
+            startProcessing(pointsAwarded, totalPoints, capsCount);
+        });
+    </script>
+</body>
+</html>
