@@ -661,6 +661,10 @@
                             <i class="fas fa-sparkles"></i>
                             Classificar Tampinha
                         </button>
+                        <button class="btn btn-success" id="validateMechanicalBtn" style="display:none;">
+                            <i class="fas fa-check-circle"></i>
+                            Validar e Depositar
+                        </button>
                         <button class="btn btn-secondary" id="resetBtn">
                             <i class="fas fa-redo"></i>
                             Tirar Outra Foto
@@ -746,6 +750,7 @@
         const previewContainer = document.getElementById('previewContainer');
         const previewImage = document.getElementById('previewImage');
         const classifyBtn = document.getElementById('classifyBtn');
+        const validateMechanicalBtn = document.getElementById('validateMechanicalBtn');
         const resetBtn = document.getElementById('resetBtn');
         const novaFotoBtn = document.getElementById('novaFotoBtn');
         const startCameraBtn = document.getElementById('startCameraBtn');
@@ -878,20 +883,12 @@
             if (isSucesso) {
                 document.getElementById('ledSucesso').classList.add('active');
                 playSound('success');
-                showInfo('Tampinha aceita com sucesso! Processando...', 'success');
+                showInfo('Tampinha aceita! Preparando para validação mecânica...', 'success');
                 
-                // Redirecionar para tela de processamento
-                const pointsAwarded = 10;
-                const capsDeposited = 1;
-                
-                setTimeout(() => {
-                    const params = new URLSearchParams({
-                        points: pointsAwarded,
-                        total: pointsAwarded,
-                        caps: capsDeposited
-                    });
-                    window.location.href = `/processing?${params.toString()}`;
-                }, 500);
+                // Mostrar botão de validação mecânica
+                classifyBtn.style.display = 'none';
+                validateMechanicalBtn.style.display = 'inline-block';
+                resultado.classList.add('show');
             } else {
                 document.getElementById('ledErro').classList.add('active');
                 playSound('error');
@@ -918,8 +915,81 @@
         resetBtn.addEventListener('click', resetForm);
         novaFotoBtn.addEventListener('click', resetForm);
 
+        // VALIDATE MECHANICAL BUTTON
+        validateMechanicalBtn.addEventListener('click', async () => {
+            if (!capturedImage) return;
+
+            startTime = Date.now();
+            loader.classList.add('show');
+            resultado.classList.remove('show');
+
+            try {
+                // Converter base64 para blob
+                const response = await fetch(capturedImage);
+                const blob = await response.blob();
+                const formData = new FormData();
+                formData.append('image', blob, 'capture.jpg');
+
+                try {
+                    const validateResponse = await fetch('/api/validate_mechanical', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await validateResponse.json();
+                    const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
+
+                    loader.classList.remove('show');
+
+                    if (!validateResponse.ok) {
+                        showError(data.message || 'Erro na validação mecânica. Tente novamente.');
+                        resultado.classList.add('show');
+                    } else {
+                        // Sucesso - redirecionar para página de sucesso
+                        playSound('success');
+                        showMechanicalSuccess(data);
+                    }
+                } catch (error) {
+                    loader.classList.remove('show');
+                    showError('Erro ao conectar com o servidor. Tente novamente.');
+                    resultado.classList.add('show');
+                }
+            } catch (error) {
+                loader.classList.remove('show');
+                showError('Erro ao processar a imagem.');
+                resultado.classList.add('show');
+            }
+        });
+
+        function showMechanicalSuccess(data) {
+            resultadoCard.className = 'resultado-card sucesso';
+            document.getElementById('resultadoIcon').innerHTML = `<i class="fas fa-check-circle"></i>`;
+            document.getElementById('resultadoTitle').textContent = 'Depósito Autorizado!';
+            
+            let message = `${data.message}\n\n🌱 Impacto Ambiental:\n`;
+            message += `• ${data.impacto.plastico_reciclado_g}g de plástico reciclado\n`;
+            message += `• ${data.impacto.co2_evitado_g}g de CO2 evitado\n`;
+            message += `• ${data.impacto.agua_economizada_ml}ml de água economizada\n`;
+            message += `• ${data.impacto.arvores_preservadas_cm2}cm² de árvores preservadas`;
+            
+            document.getElementById('resultadoMessage').textContent = message;
+            resultado.classList.add('show');
+            
+            // Redirecionar após 3 segundos
+            setTimeout(() => {
+                const params = new URLSearchParams({
+                    points: 10,
+                    total: 10,
+                    caps: 1
+                });
+                window.location.href = `/processing?${params.toString()}`;
+            }, 3000);
+        }
+
         function resetForm() {
             capturedImage = null;
+            classifyBtn.style.display = 'inline-block';
+            validateMechanicalBtn.style.display = 'none';
             previewContainer.classList.remove('show');
             uploadBox.style.display = 'flex';
             resultado.classList.remove('show');
