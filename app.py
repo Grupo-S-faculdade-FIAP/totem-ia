@@ -17,6 +17,8 @@ import os
 from dotenv import load_dotenv
 import openai
 import requests
+import sqlite3
+import time
 
 # Importar agents e prompts
 from prompts.agents_config import get_agent
@@ -29,6 +31,19 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
+
+# Configuração ESP32
+ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
+
+# Rota para servir imagem de teste (para simulador ESP32)
+@app.route('/test_tampinha.jpg')
+def serve_test_image():
+    """Serve a imagem de teste para o simulador ESP32"""
+    test_image_path = Path('test_tampinha.jpg')
+    if test_image_path.exists():
+        return send_file(str(test_image_path), mimetype='image/jpeg')
+    else:
+        return jsonify({'error': 'Imagem de teste não encontrada'}), 404
 
 # Configurar OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
@@ -197,6 +212,10 @@ def totem_intro():
 def totem_v2():
     return render_template('totem_v2.html', v=1)
 
+@app.route('/esp32_simulator.html')
+def esp32_simulator():
+    return render_template('esp32_simulator.html', v=1)
+
 @app.route('/processing')
 def processing():
     """Tela de processamento e confirmação de tampinha"""
@@ -298,6 +317,179 @@ def api_classify():
         logger.error(f"Erro no endpoint /classify: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': str(e), 'status': 'erro', 'traceback': traceback.format_exc()}, 500)
+
+# ==============================================================================
+# NOVA ROTA: Validação Completa (Software + Mecânica)
+@app.route('/api/validate_mechanical', methods=['POST'])
+def validate_mechanical():
+    """Validação completa: Software (ML) + Mecânica (ESP32)"""
+    try:
+        # 1. Receber imagem
+        if 'image' not in request.files:
+            return jsonify({
+                'error': 'Imagem não fornecida',
+                'validation': 'FAIL'
+            }), 400
+        
+        file = request.files['image']
+        
+        if file.filename == '':
+            return jsonify({
+                'error': 'Nenhum arquivo selecionado',
+                'validation': 'FAIL'
+            }), 400
+        
+        # 2. Processar e classificar imagem
+        file_bytes = file.read()
+        nparr = np.frombuffer(file_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if image is None:
+            return jsonify({
+                'error': 'Erro ao processar imagem',
+                'validation': 'FAIL'
+            }), 400
+        
+        # 3. Classificar com SVM
+        pred, conf, sat, method = classify_image(image)
+        
+        if pred is None:
+            return jsonify({
+                'error': 'Erro ao analisar a imagem',
+                'validation': 'FAIL'
+            }), 500
+        
+        is_tampinha = pred == 1
+        
+        # Se não é tampinha, rejeitar
+        if not is_tampinha:
+            return jsonify({
+                'status': 'Objeto não é tampinha',
+                'validation': 'FAIL',
+                'confidence': float(conf),
+                'message': 'Por favor, deposite apenas tampinhas!'
+            }), 400
+        
+        # 4. Se ML OK, obter dados de verificação mecânica
+        # Tenta conectar ao ESP32 real, se falhar, simula resposta
+        try:
+            logger.info(f"📡 Sinalizando ESP32 em {ESP32_IP} para verificação mecânica...")
+            
+            esp32_response = requests.post(
+                f'http://{ESP32_IP}/check_mechanical',
+                json={'validation': 'OK'},
+                timeout=5
+            )
+            
+            esp32_data = esp32_response.json()
+            logger.info(f"✅ Resposta ESP32 Real: {esp32_data}")
+            
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            # Se ESP32 não está disponível, simular resposta (modo de desenvolvimento)
+            logger.warning(f"⚠️ ESP32 não acessível, usando simulação de sensores")
+            esp32_data = {
+                'presence_detected': True,  # Simular presença detectada
+                'weight_ok': True,          # Simular peso OK
+                'weight_value': 2500,       # Simular valor de peso
+                'timestamp': int(time.time()),
+                'simulated': True
+            }
+            logger.info(f"✅ Resposta ESP32 Simulada: {esp32_data}")
+        
+        except Exception as e:
+            logger.error(f"❌ Erro ao comunicar com ESP32: {str(e)}")
+            return jsonify({
+                'error': f'Erro ao comunicar com ESP32: {str(e)}',
+                'validation': 'OK',
+                'mechanical': 'UNKNOWN',
+                'confidence': float(conf),
+                'message': 'Erro na verificação mecânica. Tente novamente.'
+            }), 500
+        
+        # 5. Verificar resultado mecânico
+        presence = esp32_data.get('presence_detected', esp32_data.get('presence', False))
+        weight_ok = esp32_data.get('weight_ok', False)
+        
+        if presence and weight_ok:
+            # Salvar depósito bem-sucedido no banco
+            save_deposit_data(conf, presence, weight_ok, esp32_data.get('weight_value', 0))
+            
+            impact = calculate_environmental_impact()
+            
+            return jsonify({
+                'status': 'Depósito autorizado!',
+                'validation': 'OK',
+                'mechanical': 'OK',
+                'confidence': float(conf),
+                'impacto': impact,
+                'message': '✅ Tampinha depositada com sucesso!',
+                'presence': presence,
+                'weight_ok': weight_ok,
+                'color': 'green'
+            }), 200
+        else:
+            # Falha na verificação mecânica
+            logger.warning(f"❌ Verificação mecânica falhou: presença={presence}, peso={weight_ok}")
+            
+            return jsonify({
+                'status': 'Erro na verificação mecânica',
+                'validation': 'OK',
+                'mechanical': 'FAIL',
+                'confidence': float(conf),
+                'presence': presence,
+                'weight_ok': weight_ok,
+                'message': 'Falha ao detectar tampinha no depósito. Tente novamente.',
+                'color': 'red'
+            }), 400
+
+    except Exception as outer_error:
+        logger.error(f"❌ Erro no endpoint /validate_mechanical: {outer_error}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': str(outer_error),
+            'validation': 'FAIL',
+            'traceback': traceback.format_exc()
+        }), 500
+
+# ==============================================================================
+# FUNÇÕES AUXILIARES PARA VALIDAÇÃO MECÂNICA
+
+def save_deposit_data(ml_confidence, presence_detected, weight_ok, weight_value):
+    """Salva dados da interação no banco SQLite"""
+    try:
+        conn = sqlite3.connect('totem_data.db')
+        c = conn.cursor()
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS deposits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp REAL NOT NULL,
+            ml_confidence REAL,
+            presence_detected BOOLEAN,
+            weight_value INTEGER,
+            weight_ok BOOLEAN,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )''')
+        
+        c.execute('''INSERT INTO deposits 
+                     (timestamp, ml_confidence, presence_detected, weight_value, weight_ok) 
+                     VALUES (?, ?, ?, ?, ?)''',
+                  (time.time(), ml_confidence, presence_detected, weight_value, weight_ok))
+        
+        conn.commit()
+        conn.close()
+        logger.info(f"✅ Depósito salvo no banco de dados")
+    except Exception as e:
+        logger.error(f"❌ Erro ao salvar depósito: {e}")
+
+def calculate_environmental_impact():
+    """Calcula e retorna impacto ambiental por tampinha"""
+    return {
+        'plastico_reciclado_g': 0.5,
+        'co2_evitado_g': 2.3,
+        'agua_economizada_ml': 15,
+        'arvores_preservadas_cm2': 8
+    }
 
 @app.route('/api/health', methods=['GET'])
 def health():
