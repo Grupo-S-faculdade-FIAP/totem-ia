@@ -58,8 +58,8 @@ else:
 # ============================================================================
 
 ESP32_API_URL = os.getenv('ESP32_API_URL', 'https://esp32-totem-server.onrender.com')
-ESP32_DEVICE_KEY = os.getenv('ESP32_DEVICE_KEY', 'esp32-totem-vnVElI_NNq8')
-JWT_SECRET = os.getenv('JWT_SECRET', 'H2osYqbtJJv3xJRzV3-g0Bt0nmcTon_JdVateUGxyTU')
+ESP32_DEVICE_KEY = os.getenv('ESP32_DEVICE_KEY', 'xxxxxxxxx')
+JWT_SECRET = os.getenv('JWT_SECRET', 'xxxxxxxxx')
 
 # Token JWT cache
 esp32_jwt_token = None

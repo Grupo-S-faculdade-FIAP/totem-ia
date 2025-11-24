@@ -295,8 +295,8 @@ Result Display (Success/Reject)
 ```bash
 # ESP32 Configuration
 ESP32_API_URL=https://esp32-totem-server.onrender.com  # Ou localhost:5001
-ESP32_DEVICE_KEY=esp32-totem-vnVElI_NNq8              # Device ID para JWT
-JWT_SECRET=seu-secret-aqui                             # Secret compartilhado
+ESP32_DEVICE_KEY=xxxxxxxxx                             # Device ID para JWT
+JWT_SECRET=xxxxxxxxx                                    # Secret compartilhado
 
 # Para desenvolvimento local
 ESP32_API_URL=http://localhost:5001
