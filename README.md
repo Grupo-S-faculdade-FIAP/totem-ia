@@ -95,6 +95,7 @@ Desenvolvemos uma solução inovadora de **totem inteligente para depósito de t
 │   (Hardware)    │    │   (SVM)         │    │   (SQLite)      │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
+
 ### Diagrama de Arquitetura (PlantUML)
 
 ![Diagrama de Componentes do Totem IA](assets/Flexmedia_Diag.png)
