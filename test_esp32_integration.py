@@ -67,8 +67,8 @@ class TestESP32Health:
         response = requests.post(
             f"{ESP32_API_URL}/api/auth/login",
             json={
-                "device_id": "esp32-totem-vnVElI_NNq8",
-                "device_key": "esp32-totem-vnVElI_NNq8"
+                "device_id": "xxxxxxxxx",
+                "device_key": "xxxxxxxxx"
             },
             timeout=5
         )
@@ -245,8 +245,8 @@ class TestESP32Endpoints:
         response = requests.post(
             f"{ESP32_API_URL}/api/auth/login",
             json={
-                "device_id": "esp32-totem-vnVElI_NNq8",
-                "device_key": "esp32-totem-vnVElI_NNq8"
+                "device_id": "xxxxxxxxx",
+                "device_key": "xxxxxxxxx"
             },
             timeout=5
         )

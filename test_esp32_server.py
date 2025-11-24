@@ -20,8 +20,8 @@ from datetime import datetime
 # ============================================================================
 
 ESP32_API_URL = "http://localhost:5001"
-DEVICE_ID = "esp32-totem-vnVElI_NNq8"
-DEVICE_KEY = "esp32-totem-vnVElI_NNq8"
+DEVICE_ID = "xxxxxxxxx"
+DEVICE_KEY = "xxxxxxxxx"
 
 # ============================================================================
 # FIXTURES
