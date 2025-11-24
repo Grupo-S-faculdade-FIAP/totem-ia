@@ -240,50 +240,33 @@ def extract_color_features(image):
         image = cv2.resize(image, (128, 128))
         logger.debug(f"✅ Imagem redimensionada para 128x128")
 
+        # Extrair apenas 8 features para match com modelo
         features = []
 
-        for channel in cv2.split(image):
-            features.extend([
-                np.mean(channel),
-                np.std(channel),
-                np.median(channel)
-            ])
+        # 1-3: Mean, Std, Median do canal B
+        b_channel = cv2.split(image)[0]
+        features.extend([
+            np.mean(b_channel),
+            np.std(b_channel),
+            np.median(b_channel)
+        ])
 
+        # 4-6: Mean, Std, Median do canal G
+        g_channel = cv2.split(image)[1]
+        features.extend([
+            np.mean(g_channel),
+            np.std(g_channel),
+            np.median(g_channel)
+        ])
+
+        # 7-8: Saturação média e contrastre geral
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        for channel in cv2.split(hsv):
-            features.extend([
-                np.mean(channel),
-                np.std(channel),
-                np.median(channel)
-            ])
-
+        saturation = np.mean(hsv[:, :, 1])
+        features.append(saturation)
+        
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        contours, _ = cv2.findContours(gray, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        if contours:
-            largest_contour = max(contours, key=cv2.contourArea)
-            area = cv2.contourArea(largest_contour)
-            perimeter = cv2.arcLength(largest_contour, True)
-
-            circularity = 4 * np.pi * area / (perimeter * perimeter) if perimeter > 0 else 0
-
-            x, y, w, h = cv2.boundingRect(largest_contour)
-            aspect_ratio = float(w) / h if h > 0 else 0
-
-            hull = cv2.convexHull(largest_contour)
-            hull_area = cv2.contourArea(hull)
-            solidity = area / hull_area if hull_area > 0 else 0
-
-            features.extend([
-                area/10000,
-                perimeter/1000,
-                circularity,
-                aspect_ratio,
-                solidity,
-                hull_area/10000
-            ])
-        else:
-            features.extend([0, 0, 0, 0, 0, 0])
+        contrast = np.std(gray)
+        features.append(contrast)
 
         return np.array(features)
     except Exception as e:
@@ -320,6 +303,13 @@ def classify_image(image):
         svm_conf = MODEL.decision_function(features_scaled)[0]
         svm_prob = 1 / (1 + np.exp(-svm_conf))
 
+        logger.info(f"🔍 SVM: pred={svm_pred}, conf={svm_conf:.2f}, prob={svm_prob:.2f}, sat={saturation:.1f}")
+
+        # Em modo debug, aceitar tampinha com confiança alta
+        if MODO_DEBUG and saturation > 50:
+            logger.info("🐛 MODO DEBUG: Aceitando como tampinha")
+            return 1, 0.95, saturation, "DEBUG_MODE"
+
         if saturation > 120:
             confidence = 0.95 if svm_pred == 1 else 0.90
             return 1, confidence, saturation, "SAT_HIGH"
@@ -331,14 +321,12 @@ def classify_image(image):
                 if svm_pred == 1:
                     return 1, 0.75, saturation, "MID_HIGH_SAT"
                 else:
-                    return 0, 0.65, saturation, "NOT_TAMPINHA"
+                    return 1, 0.70, saturation, "ACCEPT_MID_SAT"  # Aceitar tampinhas com sat media
             elif saturation < 50:
                 return 1, 0.75, saturation, "LOW_SAT_FORCE_TAMPINHA"
             else:
-                if svm_pred == 1 and svm_prob > 0.8:
-                    return 1, svm_prob, saturation, "SVM_HIGH_CONF"
-                else:
-                    return 0, max(0.7, 1-svm_prob), saturation, "NOT_TAMPINHA"
+                # Saturação entre 50-100: aceitar como tampinha
+                return 1, 0.80, saturation, "NORMAL_SAT_TAMPINHA"
 
     except Exception as e:
         logger.error(f"Erro na classificação: {e}")
@@ -488,7 +476,61 @@ def api_classify():
         return jsonify({'error': str(e), 'status': 'erro', 'traceback': traceback.format_exc()}, 500)
 
 # ==============================================================================
-# NOVA ROTA: Validação Completa (Software + Mecânica com ESP32)
+# NOVA ROTA: Validação Mecânica (Presença + Peso para ESP32)
+# ==============================================================================
+
+@app.route('/api/validate-mechanical', methods=['POST'])
+def api_validate_mechanical():
+    """
+    Validação mecânica apenas - recebe presença e peso
+    Valida e retorna resultado
+    """
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Request deve ser JSON'}), 400
+        
+        data = request.get_json()
+        presenca = data.get('presenca', True)
+        peso = data.get('peso', 2600)
+        
+        logger.info(f"🔍 Validação Mecânica: presença={presenca}, peso={peso}")
+        
+        # Validar condições mecânicas
+        is_valid = presenca and peso >= 2400 and peso <= 2800
+        
+        if is_valid:
+            logger.info("✅ Validação Mecânica: APROVADO")
+            return jsonify({
+                'status': 'aprovado',
+                'message': 'Validação mecânica aprovada',
+                'presenca': presenca,
+                'peso': peso,
+                'timestamp': datetime.now().isoformat()
+            }), 200
+        else:
+            reason = []
+            if not presenca:
+                reason.append("Presença não detectada")
+            if peso < 2400 or peso > 2800:
+                reason.append(f"Peso fora do intervalo (recebido: {peso}g)")
+            
+            logger.warning(f"❌ Validação Mecânica: REJEITADO - {', '.join(reason)}")
+            return jsonify({
+                'status': 'rejeitado',
+                'message': ', '.join(reason),
+                'presenca': presenca,
+                'peso': peso,
+                'timestamp': datetime.now().isoformat()
+            }), 200
+    
+    except Exception as e:
+        logger.error(f"Erro na validação mecânica: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'error': str(e), 'status': 'erro'}, 500)
+
+# ==============================================================================
+# ROTA ANTIGA: Validação Completa (Software + Mecânica com ESP32)
 # ==============================================================================
 
 @app.route('/api/validate-complete', methods=['POST'])
@@ -560,17 +602,35 @@ def api_validate_complete():
         # ========== ETAPA 2: Validação Mecânica (ESP32) ==========
         logger.info("📡 Enviando para validação mecânica no ESP32...")
         
-        # Obter sensores do ESP32
+        # Obter sensores do ESP32 ou usar valores do request
         sensors = get_esp32_sensors()
         
-        if not sensors:
-            logger.warning("⚠️ Não conseguiu ler sensores, mas continuando...")
-            presenca = True
-            peso = 2500
+        # Se recebeu presenca e peso no request, usar esses valores
+        if request.is_json:
+            data = request.get_json()
+            if 'presenca' in data:
+                presenca = data.get('presenca', True)
+            elif sensors:
+                presenca = sensors.get('presenca', True)
+            else:
+                presenca = True
+                
+            if 'peso' in data:
+                peso = data.get('peso', 2600)
+            elif sensors:
+                peso = sensors.get('peso', 2600)
+            else:
+                peso = 2600
         else:
-            presenca = sensors.get('presenca', True)
-            peso = sensors.get('peso', 2500)
-            logger.info(f"📊 Sensores: presença={presenca}, peso={peso}")
+            if not sensors:
+                logger.warning("⚠️ Não conseguiu ler sensores, mas continuando...")
+                presenca = True
+                peso = 2600
+            else:
+                presenca = sensors.get('presenca', True)
+                peso = sensors.get('peso', 2600)
+        
+        logger.info(f"📊 Sensores: presença={presenca}, peso={peso}")
 
         # Verificar condição mecânica
         esp32_check = check_esp32_mechanical(presenca, peso)
@@ -838,6 +898,28 @@ def health():
         'model_loaded': model_loaded,
         'timestamp': datetime.now().isoformat()
     })
+
+# ==============================================================================
+# ROTA DEBUG - Imagem Dummy
+# ==============================================================================
+
+@app.route('/debug-image/<path:filename>', methods=['GET'])
+def debug_image(filename):
+    """Retorna imagem de teste para modo debug"""
+    try:
+        # Usar test_tampinha.jpg como imagem dummy
+        image_path = Path('test_tampinha.jpg')
+        if not image_path.exists():
+            logger.warning("⚠️ test_tampinha.jpg não encontrado")
+            image_path = Path('datasets/color-cap/train/images') / filename
+        
+        if image_path.exists():
+            return send_file(str(image_path), mimetype='image/jpeg')
+        else:
+            return jsonify({'error': 'Imagem não encontrada'}), 404
+    except Exception as e:
+        logger.error(f"Erro ao servir imagem debug: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # ==============================================================================
 # TEXT-TO-SPEECH - SUSTENTABILIDADE
