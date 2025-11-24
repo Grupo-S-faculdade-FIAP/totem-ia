@@ -95,8 +95,11 @@ Desenvolvemos uma solução inovadora de **totem inteligente para depósito de t
 │   (Hardware)    │    │   (SVM)         │    │   (SQLite)      │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
-
 ### Diagrama de Arquitetura (PlantUML)
+
+![Diagrama de Componentes do Totem IA](assets/Flexmedia_Diag.png)
+
+<!-- ### Diagrama de Arquitetura (PlantUML)
 
 O projeto inclui um **diagrama completo de componentes** criado em PlantUML (`totem_ia_diagram.puml`) que detalha:
 
@@ -115,7 +118,7 @@ brew install plantuml
 plantuml totem_ia_diagram.puml
 
 # Ou usar extensão PlantUML no VS Code
-```
+``` -->
 
 ### Pipeline de Dados
 

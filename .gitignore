@@ -92,3 +92,6 @@ docs/_build/
 tmp/
 temp/
 *.tmp
+
+# Planning files
+tasks.txt
