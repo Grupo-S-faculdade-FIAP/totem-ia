@@ -32,7 +32,155 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Configuração ESP32
+# 🐛 Configurar pasta de imagens como estática
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+import os
+images_folder = os.path.join(os.path.dirname(__file__), 'images')
+app.config['IMAGES_FOLDER'] = images_folder
+
+# ============================================================================
+# 🐛 MODO DEBUG - ATIVAR PARA AMBIENTE DE DESENVOLVIMENTO
+# ============================================================================
+# ⚠️  NUNCA ATIVAR EM PRODUÇÃO!
+# Quando TRUE: Botão "Modo Debug Confirmar" aparecerá na interface
+# Permite validar tampinha automaticamente sem usar modelo ML
+# ============================================================================
+MODO_DEBUG = os.getenv('MODO_DEBUG', 'False').lower() == 'true'
+
+if MODO_DEBUG:
+    logger.warning("🐛 ⚠️  MODO DEBUG ATIVADO! Botão de confirmação automática será exibido.")
+    logger.warning("⚠️  NUNCA USE EM PRODUÇÃO!")
+else:
+    logger.info("✅ Modo Debug desativado (Produção)")
+
+# ============================================================================
+# CONFIGURAÇÃO ESP32 TOTEM SERVER (API EXTERNA)
+# ============================================================================
+
+ESP32_API_URL = os.getenv('ESP32_API_URL', 'https://esp32-totem-server.onrender.com')
+ESP32_DEVICE_KEY = os.getenv('ESP32_DEVICE_KEY', 'esp32-totem-vnVElI_NNq8')
+JWT_SECRET = os.getenv('JWT_SECRET', 'H2osYqbtJJv3xJRzV3-g0Bt0nmcTon_JdVateUGxyTU')
+
+# Token JWT cache
+esp32_jwt_token = None
+esp32_token_expiry = None
+
+logger.info(f"🔗 ESP32 API URL: {ESP32_API_URL}")
+
+def get_esp32_jwt_token():
+    """Obtém um token JWT válido da API ESP32"""
+    global esp32_jwt_token, esp32_token_expiry
+    
+    # Se tem token válido, retorna
+    if esp32_jwt_token and esp32_token_expiry and datetime.now().timestamp() < esp32_token_expiry:
+        logger.info("✅ ESP32 JWT: Usando token em cache (válido)")
+        return esp32_jwt_token
+    
+    try:
+        logger.info("🔐 ESP32: Realizando login para obter JWT token...")
+        logger.info(f"   URL: {ESP32_API_URL}/api/auth/login")
+        logger.info(f"   Device ID: {ESP32_DEVICE_KEY}")
+        
+        login_response = requests.post(
+            f"{ESP32_API_URL}/api/auth/login",
+            json={
+                "device_id": ESP32_DEVICE_KEY,
+                "device_key": ESP32_DEVICE_KEY
+            },
+            timeout=10
+        )
+        
+        logger.info(f"📡 ESP32 LOGIN RESPONSE: {login_response.status_code}")
+        logger.info(f"   Resposta: {login_response.text[:300]}")
+        
+        if login_response.status_code == 200:
+            data = login_response.json()
+            esp32_jwt_token = data['token']
+            esp32_token_expiry = datetime.now().timestamp() + data.get('expires_in', 86400) - 60
+            logger.info(f"✅ ESP32 JWT: Token obtido com sucesso!")
+            logger.info(f"   Token: {esp32_jwt_token[:30]}...")
+            logger.info(f"   Expira em: {data.get('expires_in', 86400)} segundos")
+            return esp32_jwt_token
+        else:
+            logger.error(f"❌ ESP32: Erro ao fazer login: {login_response.status_code}")
+            logger.error(f"   Resposta: {login_response.text}")
+            return None
+    except Exception as e:
+        logger.error(f"❌ ESP32: Erro ao obter token JWT: {e}")
+        return None
+
+def call_esp32_api(endpoint, method='GET', data=None):
+    """Realiza chamada à API ESP32 com autenticação JWT"""
+    token = get_esp32_jwt_token()
+    
+    if not token:
+        logger.error("❌ Não foi possível obter token JWT")
+        return None
+    
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+    
+    url = f"{ESP32_API_URL}{endpoint}"
+    
+    logger.info(f"📡 ESP32 REQUEST: {method} {endpoint}")
+    if data:
+        logger.info(f"   Dados: {data}")
+    
+    try:
+        if method == 'GET':
+            response = requests.get(url, headers=headers, timeout=10)
+        elif method == 'POST':
+            response = requests.post(url, json=data, headers=headers, timeout=10)
+        else:
+            logger.error(f"❌ Método HTTP não suportado: {method}")
+            return None
+        
+        logger.info(f"📡 ESP32 RESPONSE: {response.status_code}")
+        logger.info(f"   Resposta: {response.text[:500]}")
+        
+        if response.status_code in [200, 201]:
+            logger.info(f"✅ ESP32: Sucesso - {endpoint}")
+            return response.json()
+        else:
+            logger.error(f"❌ ESP32: API retornou {response.status_code}: {response.text}")
+            return None
+    except Exception as e:
+        logger.error(f"❌ ESP32: Erro ao chamar API: {e}")
+        return None
+
+def get_esp32_sensors():
+    """Obtém leitura dos sensores do ESP32"""
+    logger.info("🔌 ESP32: Lendo sensores...")
+    result = call_esp32_api('/api/sensors', 'GET')
+    if result:
+        logger.info(f"✅ ESP32 Sensores: Presença={result.get('presenca')}, Peso={result.get('peso')}, Temp={result.get('temperatura')}")
+    return result
+
+def check_esp32_mechanical(presenca, peso):
+    """Verifica detecção mecânica no ESP32"""
+    logger.info(f"⚙️  ESP32: Verificando condição mecânica (presença={presenca}, peso={peso})...")
+    result = call_esp32_api('/api/check_mechanical', 'POST', {
+        'presenca': presenca,
+        'peso': peso
+    })
+    if result:
+        logger.info(f"✅ ESP32: Validação mecânica - {result.get('message')}")
+    return result
+
+def confirm_esp32_detection(detection_type, confidence):
+    """Confirma detecção na API ESP32"""
+    logger.info(f"✔️  ESP32: Confirmando detecção (tipo={detection_type}, confiança={confidence})...")
+    result = call_esp32_api('/api/confirm_detection', 'POST', {
+        'detection_type': detection_type,
+        'confidence': float(confidence)
+    })
+    if result:
+        logger.info(f"✅ ESP32: Detecção confirmada - {result.get('status')}")
+    return result
+
+# Configuração ESP32 LOCAL (para fallback)
 ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
 
 # Rota para servir imagem de teste (para simulador ESP32)
@@ -210,7 +358,8 @@ def totem_intro():
 
 @app.route('/totem_v2.html')
 def totem_v2():
-    return render_template('totem_v2.html', v=1)
+    # 🐛 Passar flag MODO_DEBUG para o template
+    return render_template('totem_v2.html', v=1, modo_debug=MODO_DEBUG)
 
 @app.route('/esp32_simulator.html')
 def esp32_simulator():
@@ -235,6 +384,26 @@ def rewards():
 def test_page():
     """Página de teste para debug de JavaScript"""
     return render_template('test.html')
+
+# 🐛 ROTA PARA SERVIR IMAGENS DO MODO DEBUG
+@app.route('/debug-image/<filename>')
+def serve_debug_image(filename):
+    """Serve imagens da pasta /images para modo debug"""
+    try:
+        images_folder = app.config['IMAGES_FOLDER']
+        file_path = os.path.join(images_folder, filename)
+        
+        # Validar que o arquivo existe e está dentro da pasta permitida
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
+            logger.warning(f"🐛 DEBUG: Arquivo não encontrado: {filename}")
+            return jsonify({'error': 'Arquivo não encontrado'}), 404
+        
+        logger.info(f"🐛 DEBUG: Servindo imagem: {filename}")
+        return send_file(file_path, mimetype='image/jpeg')
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao servir imagem debug: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
@@ -319,7 +488,177 @@ def api_classify():
         return jsonify({'error': str(e), 'status': 'erro', 'traceback': traceback.format_exc()}, 500)
 
 # ==============================================================================
-# NOVA ROTA: Validação Completa (Software + Mecânica)
+# NOVA ROTA: Validação Completa (Software + Mecânica com ESP32)
+# ==============================================================================
+
+@app.route('/api/validate-complete', methods=['POST'])
+def api_validate_complete():
+    """
+    Validação completa de tampinha:
+    1. Classificação via SVM
+    2. Confirmação mecânica via ESP32
+    3. Retorna resultado
+    """
+    try:
+        image = None
+
+        # Processar imagem igual ao /api/classify
+        if request.is_json:
+            data = request.get_json()
+            if not data or 'image' not in data:
+                return jsonify({'error': 'Nenhuma imagem fornecida'}), 400
+            
+            image_data = data['image'].split(',')[1] if ',' in data['image'] else data['image']
+            image_bytes = base64.b64decode(image_data)
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        elif 'file' in request.files:
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
+            
+            allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
+            if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+                return jsonify({'error': 'Tipo de arquivo nao permitido'}), 400
+            
+            file_bytes = file.read()
+            nparr = np.frombuffer(file_bytes, np.uint8)
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        else:
+            return jsonify({'error': 'Envie uma imagem em base64 ou como arquivo'}), 400
+
+        if image is None:
+            return jsonify({'error': 'Erro ao processar imagem'}), 400
+
+        # ========== ETAPA 1: Classificação Software ==========
+        pred, conf, sat, method = classify_image(image)
+        
+        if pred is None:
+            return jsonify({
+                'status': 'erro_classificacao',
+                'message': 'Erro ao classificar imagem',
+                'timestamp': datetime.now().isoformat()
+            }), 500
+
+        is_tampinha = pred == 1
+        
+        if not is_tampinha:
+            # Se não é tampinha, rejeita imediatamente
+            logger.warning(f"❌ Item rejeitado: não é tampinha (conf: {conf:.2f})")
+            return jsonify({
+                'status': 'rejeitado',
+                'stage': 'classificacao',
+                'message': 'Item rejeitado - Não é tampinha',
+                'classification': 'NAO E TAMPINHA',
+                'confidence': float(conf),
+                'timestamp': datetime.now().isoformat()
+            }), 200
+
+        logger.info(f"✅ Classificação OK: TAMPINHA (conf: {conf:.2f})")
+
+        # ========== ETAPA 2: Validação Mecânica (ESP32) ==========
+        logger.info("📡 Enviando para validação mecânica no ESP32...")
+        
+        # Obter sensores do ESP32
+        sensors = get_esp32_sensors()
+        
+        if not sensors:
+            logger.warning("⚠️ Não conseguiu ler sensores, mas continuando...")
+            presenca = True
+            peso = 2500
+        else:
+            presenca = sensors.get('presenca', True)
+            peso = sensors.get('peso', 2500)
+            logger.info(f"📊 Sensores: presença={presenca}, peso={peso}")
+
+        # Verificar condição mecânica
+        esp32_check = check_esp32_mechanical(presenca, peso)
+        
+        if not esp32_check:
+            logger.warning("⚠️ Erro ao verificar condição mecânica")
+            return jsonify({
+                'status': 'erro_esp32',
+                'message': 'Erro ao comunicar com ESP32',
+                'timestamp': datetime.now().isoformat()
+            }), 500
+
+        # ========== ETAPA 3: Resultado Final ==========
+        
+        # Confirmar detecção
+        confirm_esp32_detection('tampinha', float(conf))
+        
+        logger.info("✅ VALIDAÇÃO COMPLETA: TAMPINHA ACEITA!")
+        
+        response = {
+            'status': 'sucesso',
+            'message': 'Tampinha aceita e validada!',
+            'stages': {
+                'classificacao': {
+                    'status': 'sucesso',
+                    'is_tampinha': True,
+                    'confidence': float(conf),
+                    'saturation': float(sat),
+                    'method': method
+                },
+                'mecanica': {
+                    'status': 'sucesso',
+                    'presenca': presenca,
+                    'peso': peso,
+                    'esp32_response': esp32_check
+                }
+            },
+            'timestamp': datetime.now().isoformat()
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        import traceback
+        logger.error(f"Erro em /validate-complete: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'status': 'erro',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+# ==============================================================================
+# NOVA ROTA: Health Check ESP32
+# ==============================================================================
+
+@app.route('/api/esp32-health', methods=['GET'])
+def esp32_health():
+    """Verifica saúde da conexão com ESP32"""
+    try:
+        response = requests.get(
+            f"{ESP32_API_URL}/api/health",
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            return jsonify({
+                'status': 'online',
+                'esp32': response.json(),
+                'timestamp': datetime.now().isoformat()
+            }), 200
+        else:
+            return jsonify({
+                'status': 'offline',
+                'message': f'ESP32 retornou {response.status_code}',
+                'timestamp': datetime.now().isoformat()
+            }), 503
+    except Exception as e:
+        logger.error(f"❌ Erro ao verificar ESP32: {e}")
+        return jsonify({
+            'status': 'offline',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 503
+
+# ==============================================================================
+# NOVA ROTA: Validação Mecânica (apenas)
+
 @app.route('/api/validate_mechanical', methods=['POST'])
 def validate_mechanical():
     """Validação completa: Software (ML) + Mecânica (ESP32)"""
