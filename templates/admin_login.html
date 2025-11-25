@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -37,6 +38,7 @@
                 opacity: 0;
                 transform: translateY(30px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -234,8 +236,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         /* FOOTER */
@@ -279,6 +286,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="login-container">
         <!-- HEADER -->
@@ -307,14 +315,8 @@
                         <i class="fas fa-user"></i>
                         Usuário
                     </label>
-                    <input
-                        type="text"
-                        id="username"
-                        name="username"
-                        placeholder="Digite seu usuário"
-                        required
-                        autocomplete="username"
-                    >
+                    <input type="text" id="username" name="username" placeholder="Digite seu usuário" required
+                        autocomplete="username">
                 </div>
 
                 <!-- PASSWORD FIELD -->
@@ -323,14 +325,8 @@
                         <i class="fas fa-key"></i>
                         Senha
                     </label>
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        placeholder="Digite sua senha"
-                        required
-                        autocomplete="current-password"
-                    >
+                    <input type="password" id="password" name="password" placeholder="Digite sua senha" required
+                        autocomplete="current-password">
                 </div>
 
                 <!-- REMEMBER ME & FORGOT PASSWORD -->
@@ -385,28 +381,21 @@
             }
         });
 
-        // ========================================================================
-        // HANDLE LOGIN
-        // ========================================================================
-
         async function handleLogin(event) {
             event.preventDefault();
 
             const username = usernameInput.value.trim();
             const password = passwordInput.value;
 
-            // Validação
             if (!username || !password) {
                 showAlert('Por favor, preencha todos os campos', 'error');
                 return;
             }
 
-            // Desabilitar botão
             loginBtn.disabled = true;
             loginBtn.innerHTML = '<div class="spinner"></div> Autenticando...';
 
             try {
-                // Enviar requisição
                 const response = await fetch('/api/admin/login', {
                     method: 'POST',
                     headers: {
@@ -421,7 +410,6 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    // Salvar preferência
                     if (rememberInput.checked) {
                         localStorage.setItem('admin_username', username);
                         localStorage.setItem('admin_remember', 'true');
@@ -430,10 +418,8 @@
                         localStorage.removeItem('admin_remember');
                     }
 
-                    // Mostrar sucesso
                     showAlert('Login realizado com sucesso!', 'success');
 
-                    // Redirecionar
                     setTimeout(() => {
                         window.location.href = '/admin/dashboard';
                     }, 1000);
@@ -450,26 +436,17 @@
             }
         }
 
-        // ========================================================================
-        // MOSTRAR ALERTA
-        // ========================================================================
-
         function showAlert(message, type) {
             alertText.textContent = message;
             alertMessage.classList.remove('error', 'success');
             alertMessage.classList.add(type, 'show');
 
-            // Auto-hide error alerts
             if (type === 'error') {
                 setTimeout(() => {
                     alertMessage.classList.remove('show');
                 }, 5000);
             }
         }
-
-        // ========================================================================
-        // ENTER KEY SUBMIT
-        // ========================================================================
 
         passwordInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -478,5 +455,5 @@
         });
     </script>
 </body>
-</html>
 
+</html>

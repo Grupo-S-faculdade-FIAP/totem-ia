@@ -193,7 +193,6 @@ def serve_test_image():
     else:
         return jsonify({'error': 'Imagem de teste não encontrada'}), 404
 
-# Configurar OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
 hf_token = os.getenv('HUGGINGFACE_TOKEN')
 
@@ -337,9 +336,9 @@ def classify_image(image):
 def index():
     return render_template('totem_intro.html', v=1)
 
-@app.route('/admin')
-def admin():
-    return render_template('admin_login.html', v=1)
+# @app.route('/admin')
+# def admin():
+#     return render_template('admin_login.html', v=1)
 
 @app.route('/admin/login')
 def admin_login():
@@ -1046,6 +1045,7 @@ def get_speech_info():
         logger.error(f"Erro ao obter informações do áudio: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 # ============================================================================
 # 🔐 AUTENTICAÇÃO - API DE LOGIN ADMIN
 # ============================================================================
@@ -1060,11 +1060,9 @@ def api_admin_login():
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
         
-        # Credenciais padrão (ALTERAR EM PRODUÇÃO!)
         ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
         ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
         
-        # Validar credenciais
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             logger.info(f"✅ Login bem-sucedido para usuário: {username}")
             return jsonify({
