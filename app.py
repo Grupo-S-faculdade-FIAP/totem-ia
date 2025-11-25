@@ -332,13 +332,22 @@ def classify_image(image):
         logger.error(f"Erro na classificação: {e}")
         return None, None, None, "ERRO"
 
-# ==============================================================================
-# ROTAS HTTP
-# ==============================================================================
 
 @app.route('/')
 def index():
     return render_template('totem_intro.html', v=1)
+
+@app.route('/admin')
+def admin():
+    return render_template('admin_login.html', v=1)
+
+@app.route('/admin/login')
+def admin_login():
+    return render_template('admin_login.html', v=1)
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    return render_template('admin.html', v=1)
 
 @app.route('/totem_intro.html')
 def totem_intro():
@@ -373,6 +382,7 @@ def test_page():
     """Página de teste para debug de JavaScript"""
     return render_template('test.html')
 
+
 # 🐛 ROTA PARA SERVIR IMAGENS DO MODO DEBUG
 @app.route('/debug-image/<filename>')
 def serve_debug_image(filename):
@@ -392,6 +402,7 @@ def serve_debug_image(filename):
     except Exception as e:
         logger.error(f"❌ Erro ao servir imagem debug: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
@@ -475,9 +486,10 @@ def api_classify():
         logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': str(e), 'status': 'erro', 'traceback': traceback.format_exc()}, 500)
 
-# ==============================================================================
+
+# =============================================================================
 # NOVA ROTA: Validação Mecânica (Presença + Peso para ESP32)
-# ==============================================================================
+# =============================================================================
 
 @app.route('/api/validate-mechanical', methods=['POST'])
 def api_validate_mechanical():
@@ -529,9 +541,10 @@ def api_validate_mechanical():
         logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': str(e), 'status': 'erro'}, 500)
 
-# ==============================================================================
-# ROTA ANTIGA: Validação Completa (Software + Mecânica com ESP32)
-# ==============================================================================
+
+# =============================================================================
+# ROTA ANTIGA: Validação Completa (Software + Mecânica com ESP32) 
+# =============================================================================
 
 @app.route('/api/validate-complete', methods=['POST'])
 def api_validate_complete():
@@ -683,9 +696,10 @@ def api_validate_complete():
             'timestamp': datetime.now().isoformat()
         }), 500
 
-# ==============================================================================
-# NOVA ROTA: Health Check ESP32
-# ==============================================================================
+
+# =============================================================================
+# NOVA ROTA: Health Check ESP32 
+# =============================================================================
 
 @app.route('/api/esp32-health', methods=['GET'])
 def esp32_health():
@@ -716,9 +730,9 @@ def esp32_health():
             'timestamp': datetime.now().isoformat()
         }), 503
 
-# ==============================================================================
-# NOVA ROTA: Validação Mecânica (apenas)
-
+# =============================================================================
+# NOVA ROTA: Validação Mecânica (apenas presença e peso - ESP32)
+# =============================================================================
 @app.route('/api/validate_mechanical', methods=['POST'])
 def validate_mechanical():
     """Validação completa: Software (ML) + Mecânica (ESP32)"""
@@ -851,8 +865,9 @@ def validate_mechanical():
             'traceback': traceback.format_exc()
         }), 500
 
-# ==============================================================================
-# FUNÇÕES AUXILIARES PARA VALIDAÇÃO MECÂNICA
+# ============================================
+# FUNÇÕES AUXILIARES PARA VALIDAÇÃO MECÂNICA 
+# ============================================
 
 def save_deposit_data(ml_confidence, presence_detected, weight_ok, weight_value):
     """Salva dados da interação no banco SQLite"""
@@ -899,9 +914,9 @@ def health():
         'timestamp': datetime.now().isoformat()
     })
 
-# ==============================================================================
+# =============================================================================
 # ROTA DEBUG - Imagem Dummy
-# ==============================================================================
+# =============================================================================
 
 @app.route('/debug-image/<path:filename>', methods=['GET'])
 def debug_image(filename):
@@ -921,9 +936,6 @@ def debug_image(filename):
         logger.error(f"Erro ao servir imagem debug: {e}")
         return jsonify({'error': str(e)}), 500
 
-# ==============================================================================
-# TEXT-TO-SPEECH - SUSTENTABILIDADE
-# ==============================================================================
 
 def generate_sustainability_speech(use_cache=True):
     """
@@ -1033,6 +1045,46 @@ def get_speech_info():
     except Exception as e:
         logger.error(f"Erro ao obter informações do áudio: {e}")
         return jsonify({'error': str(e)}), 500
+
+# ============================================================================
+# 🔐 AUTENTICAÇÃO - API DE LOGIN ADMIN
+# ============================================================================
+
+@app.route('/api/admin/login', methods=['POST'])
+def api_admin_login():
+    """
+    Autentica o usuário admin
+    """
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        
+        # Credenciais padrão (ALTERAR EM PRODUÇÃO!)
+        ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+        ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
+        
+        # Validar credenciais
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            logger.info(f"✅ Login bem-sucedido para usuário: {username}")
+            return jsonify({
+                'success': True,
+                'message': 'Login realizado com sucesso!',
+                'token': 'admin_token'  # Em produção, usar JWT
+            }), 200
+        else:
+            logger.warning(f"❌ Tentativa de login falhada para: {username}")
+            return jsonify({
+                'success': False,
+                'message': 'Usuário ou senha inválidos'
+            }), 401
+            
+    except Exception as e:
+        logger.error(f"❌ Erro na autenticação: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao processar autenticação'
+        }), 500
 
 if __name__ == '__main__':
     print("="*80)
