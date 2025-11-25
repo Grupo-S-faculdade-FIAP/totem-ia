@@ -346,7 +346,7 @@ def admin_login():
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
-    return render_template('admin.html', v=1)
+    return render_template('admin_dashboard.html', v=1)
 
 @app.route('/totem_intro.html')
 def totem_intro():
@@ -1082,6 +1082,71 @@ def api_admin_login():
         return jsonify({
             'success': False,
             'message': 'Erro ao processar autenticação'
+        }), 500
+
+@app.route('/api/admin/dashboard', methods=['GET'])
+def api_admin_dashboard():
+    """
+    Retorna dados do dashboard admin
+    """
+    try:
+        import random
+        from datetime import datetime, timedelta
+        
+        # Dados simulados (em produção, viria do banco de dados)
+        total_tampinhas = random.randint(4500, 5500)
+        aceitas = int(total_tampinhas * 0.92)
+        rejeitadas = total_tampinhas - aceitas
+        
+        # Estatísticas
+        stats = {
+            'total': total_tampinhas,
+            'aceitas': aceitas,
+            'rejeitadas': rejeitadas,
+            'changeTotal': random.randint(8, 15),
+            'changeTaxa': random.randint(2, 8),
+            'changeRejeitadas': random.randint(3, 12),
+            'today': random.randint(180, 250),
+            'week': random.randint(1200, 1800),
+            'month': random.randint(4500, 5500),
+            'year': random.randint(50000, 60000)
+        }
+        
+        # Dados de tendência (últimos 7 dias)
+        today = datetime.now()
+        trend_labels = [(today - timedelta(days=i)).strftime('%a') for i in range(6, -1, -1)]
+        trend_values = [random.randint(150, 300) for _ in range(7)]
+        trend = {
+            'labels': trend_labels,
+            'values': trend_values
+        }
+        
+        # Últimos depósitos (simulados)
+        deposits = []
+        for i in range(1, 11):
+            deposit_time = (datetime.now() - timedelta(minutes=random.randint(5, 480))).strftime('%H:%M')
+            is_accepted = random.random() > 0.08  # 92% de aceite
+            
+            deposits.append({
+                'id': 5000 + random.randint(0, 9999),
+                'time': deposit_time,
+                'count': random.randint(2, 8),
+                'status': 'aceita' if is_accepted else 'rejeitada',
+                'confidence': random.randint(75, 99) if is_accepted else random.randint(30, 75)
+            })
+        
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'trend': trend,
+            'deposits': deposits
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao carregar dados do dashboard: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500
 
 if __name__ == '__main__':
