@@ -221,8 +221,7 @@ def load_classifier():
 logger.info("Inicializando classificador...")
 MODEL, SCALER = load_classifier()
 
-# ==============================================================================
-# FUNÇÃO DE EXTRAÇÃO DE FEATURES
+
 def extract_color_features(image):
     try:
         logger.debug(f"🔍 extract_color_features iniciada. Image type: {type(image)}, shape: {image.shape if hasattr(image, 'shape') else 'N/A'}")
@@ -271,6 +270,7 @@ def extract_color_features(image):
     except Exception as e:
         logger.error(f"Erro ao extrair features: {e}")
         return None
+
 
 def classify_image(image):
     if image is None or MODEL is None or SCALER is None:
@@ -335,10 +335,6 @@ def classify_image(image):
 @app.route('/')
 def index():
     return render_template('totem_intro.html', v=1)
-
-# @app.route('/admin')
-# def admin():
-#     return render_template('admin_login.html', v=1)
 
 @app.route('/admin/login')
 def admin_login():
@@ -1083,6 +1079,7 @@ def api_admin_login():
             'success': False,
             'message': 'Erro ao processar autenticação'
         }), 500
+
 
 @app.route('/api/admin/dashboard', methods=['GET'])
 def api_admin_dashboard():
