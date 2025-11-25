@@ -109,6 +109,7 @@ def get_esp32_jwt_token():
         logger.error(f"❌ ESP32: Erro ao obter token JWT: {e}")
         return None
 
+
 def call_esp32_api(endpoint, method='GET', data=None):
     """Realiza chamada à API ESP32 com autenticação JWT"""
     token = get_esp32_jwt_token()
@@ -150,6 +151,7 @@ def call_esp32_api(endpoint, method='GET', data=None):
         logger.error(f"❌ ESP32: Erro ao chamar API: {e}")
         return None
 
+
 def get_esp32_sensors():
     """Obtém leitura dos sensores do ESP32"""
     logger.info("🔌 ESP32: Lendo sensores...")
@@ -157,6 +159,7 @@ def get_esp32_sensors():
     if result:
         logger.info(f"✅ ESP32 Sensores: Presença={result.get('presenca')}, Peso={result.get('peso')}, Temp={result.get('temperatura')}")
     return result
+
 
 def check_esp32_mechanical(presenca, peso):
     """Verifica detecção mecânica no ESP32"""
@@ -168,6 +171,7 @@ def check_esp32_mechanical(presenca, peso):
     if result:
         logger.info(f"✅ ESP32: Validação mecânica - {result.get('message')}")
     return result
+
 
 def confirm_esp32_detection(detection_type, confidence):
     """Confirma detecção na API ESP32"""
@@ -338,6 +342,10 @@ def index():
 
 @app.route('/admin/login')
 def admin_login():
+    return render_template('admin_login.html', v=1)
+
+@app.route('/admin')
+def admin():
     return render_template('admin_login.html', v=1)
 
 @app.route('/admin/dashboard')
