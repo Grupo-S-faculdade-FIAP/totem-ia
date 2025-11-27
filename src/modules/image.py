@@ -11,6 +11,8 @@ import numpy as np  # pyright: ignore[reportMissingImports]
 logger = logging.getLogger(__name__)
 
 
+MODEL, SCALER = None, None
+
 def load_classifier():
     try:
         model_path = Path('models/svm/svm_model_complete.pkl')
@@ -31,10 +33,6 @@ def load_classifier():
         import traceback
         traceback.print_exc()
         return None, None
-
-# Carregar modelo na inicialização
-logger.info("Inicializando classificador...")
-MODEL, SCALER = load_classifier()
 
 
 def extract_color_features(image):
@@ -145,3 +143,8 @@ def classify_image(image, is_debug_mode=False):
     except Exception as e:
         logger.error(f"Erro na classificação: {e}")
         return None, None, None, "ERRO"
+
+
+if __name__ == "__main__":
+    logger.info("Inicializando classificador...")
+    MODEL, SCALER = load_classifier()

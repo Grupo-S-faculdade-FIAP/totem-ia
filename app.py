@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 # Importar agents e prompts
 # from prompts.agents_config import get_agent
 
-from src.modules.image import classify_image
+from src.modules.image import classify_image, load_classifier, MODEL, SCALER
 
 from src.hardware.esp32 import ESP32_API_URL, get_esp32_sensors, calculate_environmental_impact, check_esp32_mechanical, confirm_esp32_detection
 
@@ -78,17 +78,17 @@ hf_token = os.getenv('HUGGINGFACE_TOKEN')
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    # model_loaded = MODEL is not None and SCALER is not None
-    # return jsonify({
-    #     'status': 'ok' if model_loaded else 'erro',
-    #     'model_loaded': model_loaded,
-    #     'timestamp': datetime.now().isoformat()
-    # })
+    model_loaded = MODEL is not None and SCALER is not None
     return jsonify({
-        'status': 'ok',
+        'status': 'ok' if model_loaded else 'erro',
+        'model_loaded': model_loaded,
         'timestamp': datetime.now().isoformat()
-        # 'model_loaded': model_loaded,
     })
+    # return jsonify({
+    #     'status': 'ok',
+    #     'timestamp': datetime.now().isoformat()
+    #     # 'model_loaded': model_loaded,
+    # })
 
 @app.route('/')
 def index():
@@ -484,6 +484,7 @@ def esp32_health():
             'timestamp': datetime.now().isoformat()
         }), 503
 
+
 # =============================================================================
 # NOVA ROTA: Validação Mecânica (apenas presença e peso - ESP32)
 # =============================================================================
@@ -756,12 +757,9 @@ def get_speech_info():
 # ============================================================================
 # 🔐 AUTENTICAÇÃO - API DE LOGIN ADMIN
 # ============================================================================
-
 @app.route('/api/admin/login', methods=['POST'])
 def api_admin_login():
-    """
-    Autentica o usuário admin
-    """
+    
     try:
         data = request.get_json()
         username = data.get('username', '').strip()
@@ -864,6 +862,9 @@ if __name__ == '__main__':
     print("   Sistema de Deposito Inteligente de Tampinhas")
     print("="*80)
     print()
+
+    # logger.info("Inicializando classificador...")
+    # MODEL, SCALER = load_classifier()
     
     if MODEL is None or SCALER is None:
         print("AVISO: Modelo nao carregado!")
@@ -880,6 +881,9 @@ if __name__ == '__main__':
     print()
 
     try:
+        from src.database.db import init_db
+
+        init_db()
         app.run(host='0.0.0.0', port=5005, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         print("\nServidor interrompido pelo usuario.")

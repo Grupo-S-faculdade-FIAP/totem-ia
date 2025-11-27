@@ -6,38 +6,36 @@ logger = logging.getLogger(__name__)
 
 
 def init_db():
-    conn = sqlite3.connect('totem_data.db')
-    c = conn.cursor()
 
-    c.execute('''CREATE TABLE IF NOT EXISTS deposits (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp REAL NOT NULL,
-        ml_confidence REAL,
-        presence_detected BOOLEAN,
-        weight_value INTEGER,
-        weight_ok BOOLEAN,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )''')
+    try:
+
+        conn = sqlite3.connect('totem_data.db', autocommit=True)
+        c = conn.cursor()
+        
+        # [*Validate*] Confirmar sucesso da operação no banco?
+        c.execute('''CREATE TABLE IF NOT EXISTS deposits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp REAL NOT NULL,
+            ml_confidence REAL,
+            presence_detected BOOLEAN,
+            weight_value INTEGER,
+            weight_ok BOOLEAN,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )''')
+
+        conn.close()
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar tabela: {e}")
 
 
 def save_deposit_data(ml_confidence, presence_detected, weight_ok, weight_value):
-    """Salva dados da interação no banco SQLite"""
+    
     try:
 
         # [*Validate*] Can we create connection in advanced one time only?
         conn = sqlite3.connect('totem_data.db')
         c = conn.cursor()
-        
-        # c.execute('''CREATE TABLE IF NOT EXISTS deposits (
-        #     id INTEGER PRIMARY KEY AUTOINCREMENT,
-        #     timestamp REAL NOT NULL,
-        #     ml_confidence REAL,
-        #     presence_detected BOOLEAN,
-        #     weight_value INTEGER,
-        #     weight_ok BOOLEAN,
-        #     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        # )''')
-        
+    
         c.execute('''INSERT INTO deposits 
                      (timestamp, ml_confidence, presence_detected, weight_value, weight_ok) 
                      VALUES (?, ?, ?, ?, ?)''',
