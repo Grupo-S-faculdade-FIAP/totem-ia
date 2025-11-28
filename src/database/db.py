@@ -89,6 +89,7 @@ class DatabaseConnection:
             logger.error(f"❌ Erro ao inserir depósito: {e}")
             return None
 
+
     class ResultadoInteracao(Enum):
         SUCESSO = 'sucesso'
         ERRO_CLASSIFICACAO = 'erro_classificacao'
@@ -113,6 +114,54 @@ class DatabaseConnection:
             logger.info(f"✅ Interação registrada no banco '{self.db_path}'.")
         except Exception as e:
             logger.error(f"❌ Erro ao registrar interação: {e}")
+    
+
+    def get_total_interacoes(self):
+        try:
+            conn = sqlite3.connect('totem_data.db')
+            c = conn.cursor()
+            c.execute('''SELECT COUNT(*) FROM interactions''')
+            resultado = c.fetchone()
+            total = resultado[0] if resultado else 0
+            logger.info(f"ℹ️ Total de interações no banco: {total}")
+            return total
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar total de interações: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return 0
+        finally:
+            conn.close()
+            print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
+
+
+    def get_all_deposits(self):
+        try:
+            conn = sqlite3.connect('totem_data.db')
+            c = conn.cursor()
+            c.execute('''SELECT id, timestamp, ml_confidence, presence_detected, weight_value, weight_ok, plastico_reciclado_g FROM deposits ORDER BY timestamp DESC''')
+            rows = c.fetchall()
+            deposits = []
+            for row in rows:
+                deposits.append({
+                    'id': row[0],
+                    'timestamp': row[1],
+                    'ml_confidence': row[2],
+                    'presence_detected': row[3],
+                    'weight_value': row[4],
+                    'weight_ok': row[5],
+                    'plastico_reciclado_g': row[5]
+                })
+            logger.info(f"ℹ️ Recuperados {len(deposits)} depósitos do banco")
+            return deposits
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar depósitos: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return []
+        finally:
+            conn.close()
+            print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
 
 
 
@@ -194,49 +243,5 @@ class DatabaseConnection:
 #         print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
 
 
-# def get_total_interacoes():
-#     try:
-#         conn = sqlite3.connect('totem_data.db')
-#         c = conn.cursor()
-#         c.execute('''SELECT COUNT(*) FROM interactions''')
-#         resultado = c.fetchone()
-#         total = resultado[0] if resultado else 0
-#         logger.info(f"ℹ️ Total de interações no banco: {total}")
-#         return total
-#     except Exception as e:
-#         logger.error(f"❌ Erro ao buscar total de interações: {e}")
-#         import traceback
-#         logger.error(f"Traceback: {traceback.format_exc()}")
-#         return 0
-#     finally:
-#         conn.close()
-#         print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
 
-
-# def get_all_deposits():
-#     try:
-#         conn = sqlite3.connect('totem_data.db')
-#         c = conn.cursor()
-#         c.execute('''SELECT id, timestamp, ml_confidence, presence_detected, weight_value, weight_ok FROM deposits ORDER BY timestamp DESC''')
-#         rows = c.fetchall()
-#         deposits = []
-#         for row in rows:
-#             deposits.append({
-#                 'id': row[0],
-#                 'timestamp': row[1],
-#                 'ml_confidence': row[2],
-#                 'presence_detected': row[3],
-#                 'weight_value': row[4],
-#                 'weight_ok': row[5]
-#             })
-#         logger.info(f"ℹ️ Recuperados {len(deposits)} depósitos do banco")
-#         return deposits
-#     except Exception as e:
-#         logger.error(f"❌ Erro ao buscar depósitos: {e}")
-#         import traceback
-#         logger.error(f"Traceback: {traceback.format_exc()}")
-#         return []
-#     finally:
-#         conn.close()
-#         print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
 

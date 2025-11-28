@@ -456,7 +456,7 @@ def api_validate_complete():
 # =============================================================================
 @app.route('/api/esp32-health', methods=['GET'])
 def esp32_health():
-    
+
     try:
         response = requests.get(
             f"{ESP32_API_URL}/api/health",
@@ -499,7 +499,6 @@ def validate_mechanical():
             }), 400
         
         file = request.files['image']
-        
         if file.filename == '':
             return jsonify({
                 'error': 'Nenhum arquivo selecionado',
@@ -682,12 +681,12 @@ def generate_sustainability_speech(use_cache=True):
     # Arquivo único de áudio pré-gerado com o script completo (~55 segundos)
     audio_file = audio_dir / 'sustainability_speech.wav'
     
-    # Se arquivo existe, usar ele
+    # Se arquivo existe, usar 
     if audio_file.exists():
         logger.info("✅ Usando áudio pré-gerado completo (55s)")
         return str(audio_file)
     
-    # Se não existe, criar placeholder
+    # Se não, criar placeholder
     if not audio_file.exists():
         logger.warning("⚠️ Nenhum áudio pré-gerado encontrado!")
         logger.info("💡 Áudio esperado em: static/audio/sustainability_speech.wav")
@@ -828,23 +827,27 @@ def api_admin_dashboard():
         import random
         from datetime import datetime, timedelta
         
-        # Dados simulados (em produção, viria do banco de dados)
-        total_tampinhas = random.randint(4500, 5500)
-        aceitas = int(total_tampinhas * 0.92)
-        rejeitadas = total_tampinhas - aceitas
+        if db_connection:
+            with db_connection as db:
+                deposits = db.get_all_deposits()
+                num_interactions = db.get_total_interacoes()
+
+        total_tampinhas = num_interactions
+        aceitas = len(deposits)
+        rejeitadas = num_interactions - aceitas
         
-        # Estatísticas
         stats = {
             'total': total_tampinhas,
             'aceitas': aceitas,
             'rejeitadas': rejeitadas,
-            'changeTotal': random.randint(8, 15),
-            'changeTaxa': random.randint(2, 8),
-            'changeRejeitadas': random.randint(3, 12),
-            'today': random.randint(180, 250),
-            'week': random.randint(1200, 1800),
-            'month': random.randint(4500, 5500),
-            'year': random.randint(50000, 60000)
+            'impacto': sum(deposit['plastico_reciclado_g'] for deposit in deposits),
+            'changeTotal': 0,
+            'changeTaxa': 0,
+            'changeRejeitadas': 0,
+            'today': 0,
+            'week': 0,
+            'month': 0,
+            'year': 0
         }
         
         # Dados de tendência (últimos 7 dias)
@@ -856,25 +859,13 @@ def api_admin_dashboard():
             'values': trend_values
         }
         
-        # Últimos depósitos (simulados)
-        deposits = []
-        for i in range(1, 11):
-            deposit_time = (datetime.now() - timedelta(minutes=random.randint(5, 480))).strftime('%H:%M')
-            is_accepted = random.random() > 0.08  # 92% de aceite
-            
-            deposits.append({
-                'id': 5000 + random.randint(0, 9999),
-                'time': deposit_time,
-                'count': random.randint(2, 8),
-                'status': 'aceita' if is_accepted else 'rejeitada',
-                'confidence': random.randint(75, 99) if is_accepted else random.randint(30, 75)
-            })
+        last_deposits = deposits[-10:]
         
         return jsonify({
             'success': True,
             'stats': stats,
             'trend': trend,
-            'deposits': deposits
+            'deposits': last_deposits
         }), 200
         
     except Exception as e:
