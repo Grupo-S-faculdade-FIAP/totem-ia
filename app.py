@@ -64,7 +64,6 @@ else:
 # Configuração ESP32 LOCAL (para fallback)
 ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
 
-# Inicializar classificador
 image_classifier: ImageClassifier | None 
 db_connection: DatabaseConnection | None
 
@@ -344,6 +343,12 @@ def api_validate_complete():
         pred, conf, sat, method = image_classifier.classify_image(image) if image_classifier else (None, None, None, None)
         
         if pred is None:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_DESCONHECIDO)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             return jsonify({
                 'status': 'erro_classificacao',
                 'message': 'Erro ao classificar imagem',
@@ -351,8 +356,13 @@ def api_validate_complete():
             }), 500
 
         is_tampinha = pred == 1
-        
         if not is_tampinha:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.REJEITADO)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             # Se não é tampinha, rejeita imediatamente
             logger.warning(f"❌ Item rejeitado: não é tampinha (conf: {conf:.2f})")
             return jsonify({
@@ -403,6 +413,12 @@ def api_validate_complete():
         esp32_check = check_esp32_mechanical(presenca, peso)
         
         if not esp32_check:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_MECANICA)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             logger.warning("⚠️ Erro ao verificar condição mecânica")
             return jsonify({
                 'status': 'erro_esp32',
@@ -414,7 +430,12 @@ def api_validate_complete():
         
         # Confirmar detecção
         confirm_esp32_detection('tampinha', float(conf) if conf is not None else 0.0)
-        
+        if db_connection:
+            with db_connection as db:
+                db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO)
+        else:
+            logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
         logger.info("✅ VALIDAÇÃO COMPLETA: TAMPINHA ACEITA!")
         
         response = {

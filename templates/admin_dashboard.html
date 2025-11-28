@@ -501,7 +501,7 @@
                 <div class="card-header">
                     <div>
                         <div class="card-title">Impacto Ambiental</div>
-                        <div class="card-value" id="impacto">{{ data.stats.impacto }}kg</div>
+                        <div class="card-value" id="impacto">0kg</div>
                         <div class="card-change positive">
                             <i class="fas fa-leaf"></i>
                             <span id="changeImpacto">Plástico reciclado</span>
@@ -615,10 +615,6 @@
             }
         }
 
-        // ========================================================================
-        // ATUALIZAR CARDS
-        // ========================================================================
-
         function updateCards(data) {
             // Total de Tampinhas
             document.getElementById('totalTampinhas').textContent = data.stats.total.toLocaleString('pt-BR');
@@ -633,15 +629,9 @@
             document.getElementById('rejeitadas').textContent = data.stats.rejeitadas.toLocaleString('pt-BR');
             document.getElementById('changeRejeitadas').textContent = `-${data.stats.changeRejeitadas}%`;
 
-            // Impacto Ambiental (estimativa: 2g por tampinha)
-            const impactoKg = ((data.stats.aceitas * 2) / 1000).toFixed(2);
-            document.getElementById('impacto').textContent = `${impactoKg}kg`;
+            document.getElementById('impacto').textContent = `${data.stats.impacto}kg`;
             document.getElementById('changeImpacto').textContent = 'Plástico reciclado';
         }
-
-        // ========================================================================
-        // ATUALIZAR GRÁFICOS
-        // ========================================================================
 
         function updateCharts(data) {
             updateStatusChart(data);
@@ -752,10 +742,6 @@
                 }
             });
         }
-
-        // ========================================================================
-        // ATUALIZAR TABELA
-        // ========================================================================
 
         function updateTable(data) {
             const tbody = document.getElementById('depositsTable');
