@@ -1,27 +1,34 @@
 #!/usr/bin/env python3
-"""
-TOTEM IA - API Flask para Classificação de Tampinhas
-"""
 
+from re import DEBUG
+from tkinter import Image
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
-import cv2
-import numpy as np
-import base64
-import io
-import joblib
-from pathlib import Path
-import logging
-from datetime import datetime
-import os
-from dotenv import load_dotenv
 import openai
-import requests
-import sqlite3
+import numpy as np
+
+import logging
+import os
+import base64
 import time
+import requests
+import cv2
+import joblib
+
+from datetime import datetime
+from pathlib import Path
+
+from src.database.db import DatabaseConnection
+
+from dotenv import load_dotenv
+
 
 # Importar agents e prompts
-from prompts.agents_config import get_agent
+# from prompts.agents_config import get_agent
+
+from src.modules.image import ImageClassifier
+
+from src.hardware.esp32 import ESP32_API_URL, get_esp32_sensors, calculate_environmental_impact, check_esp32_mechanical, confirm_esp32_detection
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -53,135 +60,12 @@ if MODO_DEBUG:
 else:
     logger.info("✅ Modo Debug desativado (Produção)")
 
-# ============================================================================
-# CONFIGURAÇÃO ESP32 TOTEM SERVER (API EXTERNA)
-# ============================================================================
-
-ESP32_API_URL = os.getenv('ESP32_API_URL', 'https://esp32-totem-server.onrender.com')
-ESP32_DEVICE_KEY = os.getenv('ESP32_DEVICE_KEY', 'xxxxxxxxx')
-JWT_SECRET = os.getenv('JWT_SECRET', 'xxxxxxxxx')
-
-# Token JWT cache
-esp32_jwt_token = None
-esp32_token_expiry = None
-
-logger.info(f"🔗 ESP32 API URL: {ESP32_API_URL}")
-
-def get_esp32_jwt_token():
-    """Obtém um token JWT válido da API ESP32"""
-    global esp32_jwt_token, esp32_token_expiry
-    
-    # Se tem token válido, retorna
-    if esp32_jwt_token and esp32_token_expiry and datetime.now().timestamp() < esp32_token_expiry:
-        logger.info("✅ ESP32 JWT: Usando token em cache (válido)")
-        return esp32_jwt_token
-    
-    try:
-        logger.info("🔐 ESP32: Realizando login para obter JWT token...")
-        logger.info(f"   URL: {ESP32_API_URL}/api/auth/login")
-        logger.info(f"   Device ID: {ESP32_DEVICE_KEY}")
-        
-        login_response = requests.post(
-            f"{ESP32_API_URL}/api/auth/login",
-            json={
-                "device_id": ESP32_DEVICE_KEY,
-                "device_key": ESP32_DEVICE_KEY
-            },
-            timeout=10
-        )
-        
-        logger.info(f"📡 ESP32 LOGIN RESPONSE: {login_response.status_code}")
-        logger.info(f"   Resposta: {login_response.text[:300]}")
-        
-        if login_response.status_code == 200:
-            data = login_response.json()
-            esp32_jwt_token = data['token']
-            esp32_token_expiry = datetime.now().timestamp() + data.get('expires_in', 86400) - 60
-            logger.info(f"✅ ESP32 JWT: Token obtido com sucesso!")
-            logger.info(f"   Token: {esp32_jwt_token[:30]}...")
-            logger.info(f"   Expira em: {data.get('expires_in', 86400)} segundos")
-            return esp32_jwt_token
-        else:
-            logger.error(f"❌ ESP32: Erro ao fazer login: {login_response.status_code}")
-            logger.error(f"   Resposta: {login_response.text}")
-            return None
-    except Exception as e:
-        logger.error(f"❌ ESP32: Erro ao obter token JWT: {e}")
-        return None
-
-def call_esp32_api(endpoint, method='GET', data=None):
-    """Realiza chamada à API ESP32 com autenticação JWT"""
-    token = get_esp32_jwt_token()
-    
-    if not token:
-        logger.error("❌ Não foi possível obter token JWT")
-        return None
-    
-    headers = {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json'
-    }
-    
-    url = f"{ESP32_API_URL}{endpoint}"
-    
-    logger.info(f"📡 ESP32 REQUEST: {method} {endpoint}")
-    if data:
-        logger.info(f"   Dados: {data}")
-    
-    try:
-        if method == 'GET':
-            response = requests.get(url, headers=headers, timeout=10)
-        elif method == 'POST':
-            response = requests.post(url, json=data, headers=headers, timeout=10)
-        else:
-            logger.error(f"❌ Método HTTP não suportado: {method}")
-            return None
-        
-        logger.info(f"📡 ESP32 RESPONSE: {response.status_code}")
-        logger.info(f"   Resposta: {response.text[:500]}")
-        
-        if response.status_code in [200, 201]:
-            logger.info(f"✅ ESP32: Sucesso - {endpoint}")
-            return response.json()
-        else:
-            logger.error(f"❌ ESP32: API retornou {response.status_code}: {response.text}")
-            return None
-    except Exception as e:
-        logger.error(f"❌ ESP32: Erro ao chamar API: {e}")
-        return None
-
-def get_esp32_sensors():
-    """Obtém leitura dos sensores do ESP32"""
-    logger.info("🔌 ESP32: Lendo sensores...")
-    result = call_esp32_api('/api/sensors', 'GET')
-    if result:
-        logger.info(f"✅ ESP32 Sensores: Presença={result.get('presenca')}, Peso={result.get('peso')}, Temp={result.get('temperatura')}")
-    return result
-
-def check_esp32_mechanical(presenca, peso):
-    """Verifica detecção mecânica no ESP32"""
-    logger.info(f"⚙️  ESP32: Verificando condição mecânica (presença={presenca}, peso={peso})...")
-    result = call_esp32_api('/api/check_mechanical', 'POST', {
-        'presenca': presenca,
-        'peso': peso
-    })
-    if result:
-        logger.info(f"✅ ESP32: Validação mecânica - {result.get('message')}")
-    return result
-
-def confirm_esp32_detection(detection_type, confidence):
-    """Confirma detecção na API ESP32"""
-    logger.info(f"✔️  ESP32: Confirmando detecção (tipo={detection_type}, confiança={confidence})...")
-    result = call_esp32_api('/api/confirm_detection', 'POST', {
-        'detection_type': detection_type,
-        'confidence': float(confidence)
-    })
-    if result:
-        logger.info(f"✅ ESP32: Detecção confirmada - {result.get('status')}")
-    return result
 
 # Configuração ESP32 LOCAL (para fallback)
 ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
+
+image_classifier: ImageClassifier | None = None
+db_connection: DatabaseConnection | None = None
 
 # Rota para servir imagem de teste (para simulador ESP32)
 @app.route('/test_tampinha.jpg')
@@ -193,152 +77,32 @@ def serve_test_image():
     else:
         return jsonify({'error': 'Imagem de teste não encontrada'}), 404
 
-# Configurar OpenAI
 openai.api_key = os.getenv('OPENAI_API_KEY')
 hf_token = os.getenv('HUGGINGFACE_TOKEN')
 
-def load_classifier():
-    try:
-        model_path = Path('models/svm/svm_model_complete.pkl')
-        scaler_path = Path('models/svm/scaler_complete.pkl')
 
-        if not model_path.exists() or not scaler_path.exists():
-            logger.error(f"❌ Arquivos do modelo não encontrados!")
-            logger.error(f"   - Procurando em: {model_path.absolute()}")
-            logger.error(f"   - Procurando em: {scaler_path.absolute()}")
-            return None, None
-
-        model = joblib.load(str(model_path))
-        scaler = joblib.load(str(scaler_path))
-        logger.info("✅ Modelo SVM carregado com sucesso!")
-        return model, scaler
-    except Exception as e:
-        logger.error(f"❌ Erro ao carregar modelo: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None
-
-# Carregar modelo na inicialização
-logger.info("Inicializando classificador...")
-MODEL, SCALER = load_classifier()
-
-# ==============================================================================
-# FUNÇÃO DE EXTRAÇÃO DE FEATURES
-def extract_color_features(image):
-    try:
-        logger.debug(f"🔍 extract_color_features iniciada. Image type: {type(image)}, shape: {image.shape if hasattr(image, 'shape') else 'N/A'}")
-        
-        if not isinstance(image, np.ndarray):
-            logger.error(f"❌ Imagem não é numpy array! Tipo: {type(image)}")
-            return None
-        
-        # Verificar cv2
-        if 'cv2' not in globals():
-            logger.error("❌ cv2 não está em globals()")
-            return None
-            
-        image = cv2.resize(image, (128, 128))
-        logger.debug(f"✅ Imagem redimensionada para 128x128")
-
-        # Extrair apenas 8 features para match com modelo
-        features = []
-
-        # 1-3: Mean, Std, Median do canal B
-        b_channel = cv2.split(image)[0]
-        features.extend([
-            np.mean(b_channel),
-            np.std(b_channel),
-            np.median(b_channel)
-        ])
-
-        # 4-6: Mean, Std, Median do canal G
-        g_channel = cv2.split(image)[1]
-        features.extend([
-            np.mean(g_channel),
-            np.std(g_channel),
-            np.median(g_channel)
-        ])
-
-        # 7-8: Saturação média e contrastre geral
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        saturation = np.mean(hsv[:, :, 1])
-        features.append(saturation)
-        
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        contrast = np.std(gray)
-        features.append(contrast)
-
-        return np.array(features)
-    except Exception as e:
-        logger.error(f"Erro ao extrair features: {e}")
-        return None
-
-def classify_image(image):
-    if image is None or MODEL is None or SCALER is None:
-        logger.error(f"⚠️ Prerequisitos faltando: image={image is not None}, MODEL={MODEL is not None}, SCALER={SCALER is not None}")
-        return None, None, None, "ERRO"
-
-    try:
-        logger.info(f"📸 Iniciando classificação. Imagem shape: {image.shape if image is not None else 'None'}")
-        
-        # Verificar se cv2 está disponível
-        if not hasattr(cv2, 'cvtColor'):
-            logger.error("❌ ERRO CRÍTICO: cv2 módulo não está completo!")
-            return None, None, None, "ERRO"
-        
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-        saturation = np.mean(hsv[:, :, 1])
-        logger.info(f"✅ HSV convertido. Saturação: {saturation:.1f}")
-
-        features = extract_color_features(image)
-        if features is None or np.isnan(features).any():
-            logger.error("❌ Erro ao extrair features")
-            return None, None, saturation, "ERRO"
-        
-        logger.info(f"✅ Features extraídas. Shape: {features.shape}")
-
-        features_scaled = SCALER.transform([features])
-
-        svm_pred = MODEL.predict(features_scaled)[0]
-        svm_conf = MODEL.decision_function(features_scaled)[0]
-        svm_prob = 1 / (1 + np.exp(-svm_conf))
-
-        logger.info(f"🔍 SVM: pred={svm_pred}, conf={svm_conf:.2f}, prob={svm_prob:.2f}, sat={saturation:.1f}")
-
-        # Em modo debug, aceitar tampinha com confiança alta
-        if MODO_DEBUG and saturation > 50:
-            logger.info("🐛 MODO DEBUG: Aceitando como tampinha")
-            return 1, 0.95, saturation, "DEBUG_MODE"
-
-        if saturation > 120:
-            confidence = 0.95 if svm_pred == 1 else 0.90
-            return 1, confidence, saturation, "SAT_HIGH"
-        elif saturation < 30:
-            confidence = 0.95
-            return 0, confidence, saturation, "SAT_VERY_LOW"
-        else:
-            if saturation > 100:
-                if svm_pred == 1:
-                    return 1, 0.75, saturation, "MID_HIGH_SAT"
-                else:
-                    return 1, 0.70, saturation, "ACCEPT_MID_SAT"  # Aceitar tampinhas com sat media
-            elif saturation < 50:
-                return 1, 0.75, saturation, "LOW_SAT_FORCE_TAMPINHA"
-            else:
-                # Saturação entre 50-100: aceitar como tampinha
-                return 1, 0.80, saturation, "NORMAL_SAT_TAMPINHA"
-
-    except Exception as e:
-        logger.error(f"Erro na classificação: {e}")
-        return None, None, None, "ERRO"
-
-# ==============================================================================
-# ROTAS HTTP
-# ==============================================================================
+@app.route('/api/health', methods=['GET'])
+def health():
+    return jsonify({
+        'status': 'ok',
+        'timestamp': datetime.now().isoformat()
+    })
 
 @app.route('/')
 def index():
     return render_template('totem_intro.html', v=1)
+
+@app.route('/admin/login')
+def admin_login():
+    return render_template('admin_login.html', v=1)
+
+@app.route('/admin')
+def admin():
+    return render_template('admin_login.html', v=1)
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    return render_template('admin_dashboard.html', v=1)
 
 @app.route('/totem_intro.html')
 def totem_intro():
@@ -373,6 +137,7 @@ def test_page():
     """Página de teste para debug de JavaScript"""
     return render_template('test.html')
 
+
 # 🐛 ROTA PARA SERVIR IMAGENS DO MODO DEBUG
 @app.route('/debug-image/<filename>')
 def serve_debug_image(filename):
@@ -392,6 +157,7 @@ def serve_debug_image(filename):
     except Exception as e:
         logger.error(f"❌ Erro ao servir imagem debug: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
@@ -435,7 +201,7 @@ def api_classify():
         if image is None:
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
-        pred, conf, sat, method = classify_image(image)
+        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if image_classifier else (None, None, None, None)
 
         if pred is None:
             return jsonify({
@@ -450,8 +216,8 @@ def api_classify():
             'status': 'sucesso' if is_tampinha else 'rejeitado',
             'is_tampinha': is_tampinha,
             'classification': 'TAMPINHA ACEITA!' if is_tampinha else 'NAO E TAMPINHA',
-            'confidence': float(conf),
-            'saturation': float(sat),
+            'confidence': float(conf) if conf is not None else None,
+            'saturation': float(sat) if sat is not None else None,
             'method': method,
             'timestamp': datetime.now().isoformat()
         }
@@ -475,10 +241,10 @@ def api_classify():
         logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': str(e), 'status': 'erro', 'traceback': traceback.format_exc()}, 500)
 
-# ==============================================================================
-# NOVA ROTA: Validação Mecânica (Presença + Peso para ESP32)
-# ==============================================================================
 
+# =============================================================================
+# NOVA ROTA: Validação Mecânica (Presença + Peso para ESP32)
+# =============================================================================
 @app.route('/api/validate-mechanical', methods=['POST'])
 def api_validate_mechanical():
     """
@@ -529,10 +295,10 @@ def api_validate_mechanical():
         logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': str(e), 'status': 'erro'}, 500)
 
-# ==============================================================================
-# ROTA ANTIGA: Validação Completa (Software + Mecânica com ESP32)
-# ==============================================================================
 
+# =============================================================================
+# ROTA ANTIGA: Validação Completa (Software + Mecânica com ESP32) 
+# =============================================================================
 @app.route('/api/validate-complete', methods=['POST'])
 def api_validate_complete():
     """
@@ -574,9 +340,15 @@ def api_validate_complete():
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
         # ========== ETAPA 1: Classificação Software ==========
-        pred, conf, sat, method = classify_image(image)
+        pred, conf, sat, method = image_classifier.classify_image(image) if image_classifier else (None, None, None, None)
         
         if pred is None:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_DESCONHECIDO)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             return jsonify({
                 'status': 'erro_classificacao',
                 'message': 'Erro ao classificar imagem',
@@ -584,8 +356,13 @@ def api_validate_complete():
             }), 500
 
         is_tampinha = pred == 1
-        
         if not is_tampinha:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.REJEITADO)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             # Se não é tampinha, rejeita imediatamente
             logger.warning(f"❌ Item rejeitado: não é tampinha (conf: {conf:.2f})")
             return jsonify({
@@ -593,7 +370,7 @@ def api_validate_complete():
                 'stage': 'classificacao',
                 'message': 'Item rejeitado - Não é tampinha',
                 'classification': 'NAO E TAMPINHA',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'timestamp': datetime.now().isoformat()
             }), 200
 
@@ -636,6 +413,12 @@ def api_validate_complete():
         esp32_check = check_esp32_mechanical(presenca, peso)
         
         if not esp32_check:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_MECANICA)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             logger.warning("⚠️ Erro ao verificar condição mecânica")
             return jsonify({
                 'status': 'erro_esp32',
@@ -646,8 +429,19 @@ def api_validate_complete():
         # ========== ETAPA 3: Resultado Final ==========
         
         # Confirmar detecção
-        confirm_esp32_detection('tampinha', float(conf))
-        
+        confirm_esp32_detection('tampinha', float(conf) if conf is not None else 0.0)
+
+        if db_connection:
+            with db_connection as db:
+                
+                deposit_id = db.save_deposit_data(conf, True, True, 2500, True)
+
+                db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO, deposit_id)
+
+                
+        else:
+            logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
         logger.info("✅ VALIDAÇÃO COMPLETA: TAMPINHA ACEITA!")
         
         response = {
@@ -657,8 +451,8 @@ def api_validate_complete():
                 'classificacao': {
                     'status': 'sucesso',
                     'is_tampinha': True,
-                    'confidence': float(conf),
-                    'saturation': float(sat),
+                    'confidence': float(conf) if conf is not None else None,
+                    'saturation': float(sat) if sat is not None else None,
                     'method': method
                 },
                 'mecanica': {
@@ -683,13 +477,13 @@ def api_validate_complete():
             'timestamp': datetime.now().isoformat()
         }), 500
 
-# ==============================================================================
-# NOVA ROTA: Health Check ESP32
-# ==============================================================================
 
+# =============================================================================
+# NOVA ROTA: Health Check ESP32 
+# =============================================================================
 @app.route('/api/esp32-health', methods=['GET'])
 def esp32_health():
-    """Verifica saúde da conexão com ESP32"""
+
     try:
         response = requests.get(
             f"{ESP32_API_URL}/api/health",
@@ -716,9 +510,10 @@ def esp32_health():
             'timestamp': datetime.now().isoformat()
         }), 503
 
-# ==============================================================================
-# NOVA ROTA: Validação Mecânica (apenas)
 
+# =============================================================================
+# NOVA ROTA: Validação Mecânica (apenas presença e peso - ESP32)
+# =============================================================================
 @app.route('/api/validate_mechanical', methods=['POST'])
 def validate_mechanical():
     """Validação completa: Software (ML) + Mecânica (ESP32)"""
@@ -731,7 +526,6 @@ def validate_mechanical():
             }), 400
         
         file = request.files['image']
-        
         if file.filename == '':
             return jsonify({
                 'error': 'Nenhum arquivo selecionado',
@@ -750,9 +544,15 @@ def validate_mechanical():
             }), 400
         
         # 3. Classificar com SVM
-        pred, conf, sat, method = classify_image(image)
+        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if image_classifier else (None, None, None, None)
         
         if pred is None:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_DESCONHECIDO)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             return jsonify({
                 'error': 'Erro ao analisar a imagem',
                 'validation': 'FAIL'
@@ -762,10 +562,16 @@ def validate_mechanical():
         
         # Se não é tampinha, rejeitar
         if not is_tampinha:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_CLASSIFICACAO)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             return jsonify({
                 'status': 'Objeto não é tampinha',
                 'validation': 'FAIL',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'message': 'Por favor, deposite apenas tampinhas!'
             }), 400
         
@@ -801,7 +607,7 @@ def validate_mechanical():
                 'error': f'Erro ao comunicar com ESP32: {str(e)}',
                 'validation': 'OK',
                 'mechanical': 'UNKNOWN',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'message': 'Erro na verificação mecânica. Tente novamente.'
             }), 500
         
@@ -810,16 +616,29 @@ def validate_mechanical():
         weight_ok = esp32_data.get('weight_ok', False)
         
         if presence and weight_ok:
-            # Salvar depósito bem-sucedido no banco
-            save_deposit_data(conf, presence, weight_ok, esp32_data.get('weight_value', 0))
-            
+
+            # return {
+            #     'plastico_reciclado_g': 0.5,
+            #     'co2_evitado_g': 2.3,
+            #     'agua_economizada_ml': 15,
+            #     'arvores_preservadas_cm2': 8
+            # }
             impact = calculate_environmental_impact()
-            
+            plastico_reciclado_g = impact.get('plastico_reciclado_g', 0)
+
+            if db_connection:
+                with db_connection as db:
+                    deposit_id = db.save_deposit_data(conf, presence, weight_ok, esp32_data.get('weight_value', 0), plastico_reciclado_g)
+
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO, deposit_id)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             return jsonify({
                 'status': 'Depósito autorizado!',
                 'validation': 'OK',
                 'mechanical': 'OK',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'impacto': impact,
                 'message': '✅ Tampinha depositada com sucesso!',
                 'presence': presence,
@@ -827,14 +646,19 @@ def validate_mechanical():
                 'color': 'green'
             }), 200
         else:
-            # Falha na verificação mecânica
             logger.warning(f"❌ Verificação mecânica falhou: presença={presence}, peso={weight_ok}")
+
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_MECANICA)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
             
             return jsonify({
                 'status': 'Erro na verificação mecânica',
                 'validation': 'OK',
                 'mechanical': 'FAIL',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'presence': presence,
                 'weight_ok': weight_ok,
                 'message': 'Falha ao detectar tampinha no depósito. Tente novamente.',
@@ -851,58 +675,10 @@ def validate_mechanical():
             'traceback': traceback.format_exc()
         }), 500
 
-# ==============================================================================
-# FUNÇÕES AUXILIARES PARA VALIDAÇÃO MECÂNICA
 
-def save_deposit_data(ml_confidence, presence_detected, weight_ok, weight_value):
-    """Salva dados da interação no banco SQLite"""
-    try:
-        conn = sqlite3.connect('totem_data.db')
-        c = conn.cursor()
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS deposits (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp REAL NOT NULL,
-            ml_confidence REAL,
-            presence_detected BOOLEAN,
-            weight_value INTEGER,
-            weight_ok BOOLEAN,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )''')
-        
-        c.execute('''INSERT INTO deposits 
-                     (timestamp, ml_confidence, presence_detected, weight_value, weight_ok) 
-                     VALUES (?, ?, ?, ?, ?)''',
-                  (time.time(), ml_confidence, presence_detected, weight_value, weight_ok))
-        
-        conn.commit()
-        conn.close()
-        logger.info(f"✅ Depósito salvo no banco de dados")
-    except Exception as e:
-        logger.error(f"❌ Erro ao salvar depósito: {e}")
-
-def calculate_environmental_impact():
-    """Calcula e retorna impacto ambiental por tampinha"""
-    return {
-        'plastico_reciclado_g': 0.5,
-        'co2_evitado_g': 2.3,
-        'agua_economizada_ml': 15,
-        'arvores_preservadas_cm2': 8
-    }
-
-@app.route('/api/health', methods=['GET'])
-def health():
-    model_loaded = MODEL is not None and SCALER is not None
-    return jsonify({
-        'status': 'ok' if model_loaded else 'erro',
-        'model_loaded': model_loaded,
-        'timestamp': datetime.now().isoformat()
-    })
-
-# ==============================================================================
+# =============================================================================
 # ROTA DEBUG - Imagem Dummy
-# ==============================================================================
-
+# =============================================================================
 @app.route('/debug-image/<path:filename>', methods=['GET'])
 def debug_image(filename):
     """Retorna imagem de teste para modo debug"""
@@ -921,9 +697,6 @@ def debug_image(filename):
         logger.error(f"Erro ao servir imagem debug: {e}")
         return jsonify({'error': str(e)}), 500
 
-# ==============================================================================
-# TEXT-TO-SPEECH - SUSTENTABILIDADE
-# ==============================================================================
 
 def generate_sustainability_speech(use_cache=True):
     """
@@ -935,12 +708,12 @@ def generate_sustainability_speech(use_cache=True):
     # Arquivo único de áudio pré-gerado com o script completo (~55 segundos)
     audio_file = audio_dir / 'sustainability_speech.wav'
     
-    # Se arquivo existe, usar ele
+    # Se arquivo existe, usar 
     if audio_file.exists():
         logger.info("✅ Usando áudio pré-gerado completo (55s)")
         return str(audio_file)
     
-    # Se não existe, criar placeholder
+    # Se não, criar placeholder
     if not audio_file.exists():
         logger.warning("⚠️ Nenhum áudio pré-gerado encontrado!")
         logger.info("💡 Áudio esperado em: static/audio/sustainability_speech.wav")
@@ -966,6 +739,7 @@ def generate_sustainability_speech(use_cache=True):
     
     return str(audio_file)
 
+
 @app.route('/api/speech/sustainability', methods=['GET'])
 def get_sustainability_speech():
     """
@@ -983,7 +757,6 @@ def get_sustainability_speech():
             
             logger.info(f"📤 Servindo áudio: {audio_file} ({file_size} bytes)")
             
-            # Determinar tipo MIME
             file_ext = file_path.suffix.lower()
             if file_ext == '.wav':
                 mimetype = 'audio/wav'
@@ -1015,6 +788,7 @@ def get_sustainability_speech():
         logger.error(f"❌ Erro ao servir áudio: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/api/speech/info', methods=['GET'])
 def get_speech_info():
     """
@@ -1034,20 +808,110 @@ def get_speech_info():
         logger.error(f"Erro ao obter informações do áudio: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+# ============================================================================
+# 🔐 AUTENTICAÇÃO - API DE LOGIN ADMIN
+# ============================================================================
+@app.route('/api/admin/login', methods=['POST'])
+def api_admin_login():
+    
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        password = data.get('password', '').strip()
+        
+        ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+        ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
+        
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            logger.info(f"✅ Login bem-sucedido para usuário: {username}")
+            return jsonify({
+                'success': True,
+                'message': 'Login realizado com sucesso!',
+                'token': 'admin_token'  # Em produção, usar JWT
+            }), 200
+        else:
+            logger.warning(f"❌ Tentativa de login falhada para: {username}")
+            return jsonify({
+                'success': False,
+                'message': 'Usuário ou senha inválidos'
+            }), 401
+            
+    except Exception as e:
+        logger.error(f"❌ Erro na autenticação: {e}")
+        return jsonify({
+            'success': False,
+            'message': 'Erro ao processar autenticação'
+        }), 500
+
+
+@app.route('/api/admin/dashboard', methods=['GET'])
+def api_admin_dashboard():
+    """
+    Retorna dados para o dashboard admin
+    """
+    try:
+        import random
+        from datetime import datetime, timedelta
+        
+        if db_connection:
+            with db_connection as db:
+                deposits = db.get_all_deposits()
+                num_interactions = db.get_total_interacoes()
+
+        total_tampinhas = num_interactions
+        aceitas = len(deposits)
+        rejeitadas = num_interactions - aceitas
+        
+        stats = {
+            'total': total_tampinhas,
+            'aceitas': aceitas,
+            'rejeitadas': rejeitadas,
+            'impacto': (sum(deposit['weight_value'] for deposit in deposits) / 1000.0) * 0.002,
+            'changeTotal': 0,
+            'changeTaxa': 0,
+            'changeRejeitadas': 0,
+            'today': 0,
+            'week': 0,
+            'month': 0,
+            'year': 0
+        }
+        
+        # Dados de tendência (últimos 7 dias)
+        today = datetime.now()
+        trend_labels = [(today - timedelta(days=i)).strftime('%a') for i in range(6, -1, -1)]
+        trend_values = [random.randint(150, 300) for _ in range(7)]
+        trend = {
+            'labels': trend_labels,
+            'values': trend_values
+        }
+        
+        last_deposits = deposits[-10:]
+        
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'trend': trend,
+            'deposits': last_deposits
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao carregar dados do dashboard: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     print("="*80)
     print("TOTEM IA - API FLASK")
     print("   Sistema de Deposito Inteligente de Tampinhas")
     print("="*80)
     print()
-    
-    if MODEL is None or SCALER is None:
-        print("AVISO: Modelo nao carregado!")
-        print("   O servidor ira retornar erros ao tentar classificar.")
-        print("   Verifique se os arquivos existem:")
-        print("   - models/svm/svm_model_complete.pkl")
-        print("   - models/svm/scaler_complete.pkl")
-        print()
+
+    image_classifier = ImageClassifier()
+    image_classifier.load_classifier()
     
     print("Servidor iniciando em http://0.0.0.0:5003")
     print("   Acesse http://localhost:5003 no navegador")
@@ -1056,6 +920,8 @@ if __name__ == '__main__':
     print()
 
     try:
+        db_connection = DatabaseConnection()
+        db_connection.init_db()
         app.run(host='0.0.0.0', port=5005, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         print("\nServidor interrompido pelo usuario.")
