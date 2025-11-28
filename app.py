@@ -848,7 +848,7 @@ def api_admin_login():
 @app.route('/api/admin/dashboard', methods=['GET'])
 def api_admin_dashboard():
     """
-    Retorna dados do dashboard admin
+    Retorna dados para o dashboard admin
     """
     try:
         import random
@@ -867,7 +867,7 @@ def api_admin_dashboard():
             'total': total_tampinhas,
             'aceitas': aceitas,
             'rejeitadas': rejeitadas,
-            'impacto': sum(deposit['plastico_reciclado_g'] for deposit in deposits),
+            'impacto': (sum(deposit['weight_value'] for deposit in deposits) / 1000.0) * 0.002,
             'changeTotal': 0,
             'changeTaxa': 0,
             'changeRejeitadas': 0,

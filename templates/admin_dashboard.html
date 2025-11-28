@@ -422,7 +422,6 @@
 
 <body>
     <div class="container">
-        <!-- HEADER -->
         <div class="header">
             <div class="header-left">
                 <h1>
@@ -445,7 +444,6 @@
 
         <!-- KPI CARDS -->
         <div class="grid">
-            <!-- Total de Tampinhas -->
             <div class="card">
                 <div class="card-header">
                     <div>
@@ -462,7 +460,6 @@
                 </div>
             </div>
 
-            <!-- Taxa de Aceite -->
             <div class="card">
                 <div class="card-header">
                     <div>
@@ -479,7 +476,6 @@
                 </div>
             </div>
 
-            <!-- Rejeitadas -->
             <div class="card">
                 <div class="card-header">
                     <div>
@@ -496,7 +492,6 @@
                 </div>
             </div>
 
-            <!-- Sustentabilidade -->
             <div class="card">
                 <div class="card-header">
                     <div>
@@ -529,7 +524,6 @@
             </div>
         </div>
 
-        <!-- RECENT DEPOSITS -->
         <div class="table-section">
             <h3><i class="fas fa-history"></i> Últimos Depósitos</h3>
             <table>
@@ -537,7 +531,6 @@
                     <tr>
                         <th>ID</th>
                         <th>Horário</th>
-                        <th>Tampinhas</th>
                         <th>Status</th>
                         <th>Confiança</th>
                         <th>Ações</th>
@@ -583,18 +576,11 @@
     </div>
 
     <script>
-        // ========================================================================
-        // INICIALIZAÇÃO
-        // ========================================================================
 
         document.addEventListener('DOMContentLoaded', () => {
             loadDashboard();
-            setInterval(loadDashboard, 30000); // Atualizar a cada 30 segundos
+            setInterval(loadDashboard, 90000);
         });
-
-        // ========================================================================
-        // CARREGAR DADOS
-        // ========================================================================
 
         async function loadDashboard() {
             try {
@@ -754,15 +740,19 @@
 
             data.deposits.forEach(deposit => {
                 const row = document.createElement('tr');
-                const statusClass = deposit.status === 'aceita' ? 'success' : 'error';
-                const statusText = deposit.status === 'aceita' ? 'Aceita' : 'Rejeitada';
+                // const statusClass = deposit.status === 'aceita' ? 'success' : 'error';
+                // const statusText = deposit.status === 'aceita' ? 'Aceita' : 'Rejeitada';
 
+                // <th>ID</th>
+                // <th>Horário</th>
+                // <th>Status</th>
+                // <th>Confiança</th>
+                // <th>Ações</th>
                 row.innerHTML = `
                     <td>#${deposit.id}</td>
-                    <td>${deposit.time}</td>
-                    <td>${deposit.count}</td>
-                    <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                    <td>${deposit.confidence}%</td>
+                    <td>${new Date(deposit.timestamp * 1000).toLocaleString('pt-BR')}</td>
+                    <td><span class="status-badge success Aceita</span></td>
+                    <td>${deposit.ml_confidence}%</td>
                     <td>
                         <div class="action-buttons">
                             <button class="btn-action" onclick="viewDetails(${deposit.id})" title="Visualizar">
@@ -775,9 +765,6 @@
             });
         }
 
-        // ========================================================================
-        // ATUALIZAR STATS
-        // ========================================================================
 
         function updateStats(data) {
             document.getElementById('statToday').textContent = data.stats.today.toLocaleString('pt-BR');
@@ -785,10 +772,6 @@
             document.getElementById('statMonth').textContent = data.stats.month.toLocaleString('pt-BR');
             document.getElementById('statYear').textContent = data.stats.year.toLocaleString('pt-BR');
         }
-
-        // ========================================================================
-        // AÇÕES
-        // ========================================================================
 
         function updateLastUpdate() {
             const now = new Date();
@@ -810,9 +793,6 @@
             }
         }
 
-        // ========================================================================
-        // USUÁRIO
-        // ========================================================================
 
         window.addEventListener('load', () => {
             const username = localStorage.getItem('admin_username') || 'Admin';
