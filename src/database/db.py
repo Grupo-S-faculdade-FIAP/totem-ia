@@ -24,6 +24,16 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )''')
 
+        # Criação da tabela 'interactions' para registrar todas as tentativas (sucesso e falha), evitando duplicidade de dados da tabela 'deposits'
+        c.execute('''CREATE TABLE IF NOT EXISTS interactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            deposit_id INTEGER, -- nulo se não houve depósito bem-sucedido
+            timestamp REAL NOT NULL,
+            resultado TEXT NOT NULL, -- 'sucesso', 'erro_classificacao', 'erro_mecanica', 'rejeitado', etc.
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(deposit_id) REFERENCES deposits(id)
+        )''')
+
         conn.commit()
         logger.info(f"✅ Tabela 'deposits' criada com sucesso.")
     except Exception as e:
@@ -50,6 +60,24 @@ def save_deposit_data(ml_confidence, presence_detected, weight_ok, weight_value)
         logger.info(f"✅ Depósito salvo no banco de dados")
     except Exception as e:
         logger.error(f"❌ Erro ao salvar depósito: {e}")
+    finally:
+        conn.close()
+        print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
+
+
+def save_interaction_data(deposit_id, timestamp, resultado):
+    try:
+
+        # [*Validate*] Can we create connection in advanced one time only?
+        conn = sqlite3.connect('totem_data.db')
+        c = conn.cursor()
+        c.execute('''INSERT INTO interactions (deposit_id, timestamp, resultado) VALUES (?, ?, ?)''', (deposit_id, timestamp, resultado))
+        conn.commit()
+        logger.info(f"✅ Interação salva no banco de dados")
+    except Exception as e:
+        logger.error(f"❌ Erro ao salvar interação: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
     finally:
         conn.close()
         print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
