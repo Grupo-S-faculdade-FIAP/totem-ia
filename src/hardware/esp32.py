@@ -1,15 +1,14 @@
 import logging
 import os
 import requests
+from dotenv import load_dotenv
 from datetime import datetime
 
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# CONFIGURAÇÃO ESP32 TOTEM SERVER (API EXTERNA)
-# ============================================================================
 ESP32_API_URL = os.getenv('ESP32_API_URL', 'https://esp32-totem-server.onrender.com')
 ESP32_DEVICE_KEY = os.getenv('ESP32_DEVICE_KEY', 'xxxxxxxxx')
 JWT_SECRET = os.getenv('JWT_SECRET', 'xxxxxxxxx')
@@ -32,14 +31,21 @@ def get_esp32_jwt_token():
         logger.info("🔐 ESP32: Realizando login para obter JWT token...")
         logger.info(f"   URL: {ESP32_API_URL}/api/auth/login")
         logger.info(f"   Device ID: {ESP32_DEVICE_KEY}")
-        
+
+        # """
+        # POST /api/auth/login
+        # {
+        #     "device_id": ESP32_DEVICE_KEY,
+        #     "device_key": ESP32_DEVICE_KEY
+        # }
+        # """    
         login_response = requests.post(
             f"{ESP32_API_URL}/api/auth/login",
             json={
                 "device_id": ESP32_DEVICE_KEY,
                 "device_key": ESP32_DEVICE_KEY
             },
-            timeout=10
+            timeout=15
         )
         
         logger.info(f"📡 ESP32 LOGIN RESPONSE: {login_response.status_code}")
