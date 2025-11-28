@@ -363,7 +363,7 @@ def api_validate_complete():
                 'timestamp': datetime.now().isoformat()
             }), 200
 
-        logger.info(f"✅ Classificação OK: TAMPINHA (conf: {conf:.2f if conf is not None else 'N/A'})")
+        logger.info(f"✅ Classificação OK: TAMPINHA (conf: {conf:.2f})")
 
         # ========== ETAPA 2: Validação Mecânica (ESP32) ==========
         logger.info("📡 Enviando para validação mecânica no ESP32...")
@@ -412,7 +412,7 @@ def api_validate_complete():
         # ========== ETAPA 3: Resultado Final ==========
         
         # Confirmar detecção
-        confirm_esp32_detection('tampinha', float(conf))
+        confirm_esp32_detection('tampinha', float(conf) if conf is not None else 0.0)
         
         logger.info("✅ VALIDAÇÃO COMPLETA: TAMPINHA ACEITA!")
         

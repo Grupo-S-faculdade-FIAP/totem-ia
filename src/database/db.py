@@ -9,7 +9,9 @@ def init_db():
 
     try:
         conn = sqlite3.connect('totem_data.db')
+        print(f"✅ Conexão com o banco de dados 'totem_data.db' estabelecida.")
         c = conn.cursor()
+        print(f"✅ Cursor criado com sucesso.")
         
         # [*Validate*] Confirmar sucesso da operação no banco?
         c.execute('''CREATE TABLE IF NOT EXISTS deposits (
@@ -23,10 +25,12 @@ def init_db():
         )''')
 
         conn.commit()
-        conn.close()
         logger.info(f"✅ Tabela 'deposits' criada com sucesso.")
     except Exception as e:
         logger.error(f"❌ Erro ao criar tabela: {e}")
+    finally:
+        conn.close()
+        print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
 
 
 def save_deposit_data(ml_confidence, presence_detected, weight_ok, weight_value):
@@ -43,7 +47,9 @@ def save_deposit_data(ml_confidence, presence_detected, weight_ok, weight_value)
                   (time.time(), ml_confidence, presence_detected, weight_value, weight_ok))
         
         conn.commit()
-        conn.close()
         logger.info(f"✅ Depósito salvo no banco de dados")
     except Exception as e:
         logger.error(f"❌ Erro ao salvar depósito: {e}")
+    finally:
+        conn.close()
+        print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
