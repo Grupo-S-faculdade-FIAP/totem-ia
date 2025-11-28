@@ -18,7 +18,7 @@ import joblib
 from datetime import datetime
 from pathlib import Path
 
-from src.database.db import save_deposit_data
+from src.database.db import DatabaseConnection
 
 from dotenv import load_dotenv
 
@@ -66,6 +66,7 @@ ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
 
 # Inicializar classificador
 image_classifier: ImageClassifier | None 
+db_connection: DatabaseConnection | None
 
 # Rota para servir imagem de teste (para simulador ESP32)
 @app.route('/test_tampinha.jpg')
@@ -455,7 +456,7 @@ def api_validate_complete():
 # =============================================================================
 @app.route('/api/esp32-health', methods=['GET'])
 def esp32_health():
-    """Verifica saúde da conexão com ESP32"""
+    
     try:
         response = requests.get(
             f"{ESP32_API_URL}/api/health",
@@ -520,6 +521,12 @@ def validate_mechanical():
         pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if image_classifier else (None, None, None, None)
         
         if pred is None:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_DESCONHECIDO)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             return jsonify({
                 'error': 'Erro ao analisar a imagem',
                 'validation': 'FAIL'
@@ -529,6 +536,12 @@ def validate_mechanical():
         
         # Se não é tampinha, rejeitar
         if not is_tampinha:
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_CLASSIFICACAO)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             return jsonify({
                 'status': 'Objeto não é tampinha',
                 'validation': 'FAIL',
@@ -577,11 +590,24 @@ def validate_mechanical():
         weight_ok = esp32_data.get('weight_ok', False)
         
         if presence and weight_ok:
-            # Salvar depósito bem-sucedido no banco
-            save_deposit_data(conf, presence, weight_ok, esp32_data.get('weight_value', 0))
-            
+
+            # return {
+            #     'plastico_reciclado_g': 0.5,
+            #     'co2_evitado_g': 2.3,
+            #     'agua_economizada_ml': 15,
+            #     'arvores_preservadas_cm2': 8
+            # }
             impact = calculate_environmental_impact()
-            
+            plastico_reciclado_g = impact.get('plastico_reciclado_g', 0)
+
+            if db_connection:
+                with db_connection as db:
+                    deposit_id = db.save_deposit_data(conf, presence, weight_ok, esp32_data.get('weight_value', 0), plastico_reciclado_g)
+
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO, deposit_id)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+
             return jsonify({
                 'status': 'Depósito autorizado!',
                 'validation': 'OK',
@@ -594,8 +620,13 @@ def validate_mechanical():
                 'color': 'green'
             }), 200
         else:
-            # Falha na verificação mecânica
             logger.warning(f"❌ Verificação mecânica falhou: presença={presence}, peso={weight_ok}")
+
+            if db_connection:
+                with db_connection as db:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_MECANICA)
+            else:
+                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
             
             return jsonify({
                 'status': 'Erro na verificação mecânica',
@@ -871,9 +902,9 @@ if __name__ == '__main__':
     print()
 
     try:
-        from src.database.db import init_db
-
-        init_db()
+        from src.database.db import DatabaseConnection
+        with DatabaseConnection() as db:
+            db.init_db()
         app.run(host='0.0.0.0', port=5005, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         print("\nServidor interrompido pelo usuario.")

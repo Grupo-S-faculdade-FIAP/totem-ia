@@ -2,8 +2,11 @@ import sqlite3
 import logging
 import time 
 
+from enum import Enum
+
 
 logger = logging.getLogger(__name__)
+
 
 
 class DatabaseConnection:
@@ -12,29 +15,30 @@ class DatabaseConnection:
         self.conn = None
 
     def __enter__(self):
-        self.connect()
+        self.__connect()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+        self.__close()
 
-    def connect(self):
+    def __connect(self):
         try:
             self.conn = sqlite3.connect(self.db_path)
             logger.info(f"✅ Conexão com o banco de dados '{self.db_path}' aberta.")
         except Exception as e:
             logger.error(f"❌ Erro ao conectar ao banco: {e}")
 
-    def close(self):
+    def __close(self):
         if self.conn:
             self.conn.close()
             logger.info(f"✅ Conexão com o banco de dados '{self.db_path}' fechada.")
             self.conn = None
-
+    
+    
     def init_db(self):
         try:
             if not self.conn:
-                self.connect()
+                self.__connect()
             
             if not self.conn:
                 raise Exception("Conexão com o banco de dados não estabelecida.")
@@ -47,6 +51,7 @@ class DatabaseConnection:
                 presence_detected BOOLEAN,
                 weight_value INTEGER,
                 weight_ok BOOLEAN,
+                plastico_reciclado_g REAL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )''')
 
@@ -54,7 +59,7 @@ class DatabaseConnection:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 deposit_id INTEGER,
                 timestamp REAL NOT NULL,
-                resultado TEXT NOT NULL,
+                resultado TEXT NOT NULL, -- 'sucesso', 'erro_classificacao', 'erro_mecanica', 'rejeitado', etc.
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(deposit_id) REFERENCES deposits(id)
             )''')
@@ -63,28 +68,38 @@ class DatabaseConnection:
         except Exception as e:
             logger.error(f"❌ Erro ao criar tabelas: {e}")
 
-    def save_deposit_data(self, ml_confidence, presence_detected, weight_ok, weight_value):
+
+    def save_deposit_data(self, ml_confidence, presence_detected, weight_ok, weight_value, plastico_reciclado_g) -> int | None:
         try:
             if not self.conn:
-                self.connect()
+                self.__connect()
+
             if not self.conn:
                 raise Exception("Conexão com o banco de dados não estabelecida.")
+
             c = self.conn.cursor()
-            c.execute('''INSERT INTO deposits 
-                         (timestamp, ml_confidence, presence_detected, weight_value, weight_ok)
-                         VALUES (?, ?, ?, ?, ?)''',
-                      (time.time(), ml_confidence, presence_detected, weight_value, weight_ok))
+            result = c.execute('''INSERT INTO deposits 
+                         (timestamp, ml_confidence, presence_detected, weight_value, weight_ok, plastico_reciclado_g)
+                         VALUES (?, ?, ?, ?, ?, ?)''',
+                      (time.time(), ml_confidence, presence_detected, weight_value, weight_ok, plastico_reciclado_g))
             self.conn.commit()
             logger.info(f"✅ Dados do depósito inseridos no banco '{self.db_path}'.")
+            return result.lastrowid if result else None
         except Exception as e:
             logger.error(f"❌ Erro ao inserir depósito: {e}")
-        # Se desejado, retorne o ID do depósito inserido:
-        #     return c.lastrowid
+            return None
 
-    def save_interaction(self, resultado, deposit_id=None):
+    class ResultadoInteracao(Enum):
+        SUCESSO = 'sucesso'
+        ERRO_CLASSIFICACAO = 'erro_classificacao'
+        ERRO_MECANICA = 'erro_mecanica'
+        REJEITADO = 'rejeitado'
+        ERRO_DESCONHECIDO = 'erro_desconhecido'
+
+    def save_interaction(self, resultado: ResultadoInteracao, deposit_id=None):
         try:
             if not self.conn:
-                self.connect()
+                self.__connect()
 
             if not self.conn:
                 raise Exception("Conexão com o banco de dados não estabelecida.")
@@ -93,7 +108,7 @@ class DatabaseConnection:
             c.execute('''INSERT INTO interactions 
                          (deposit_id, timestamp, resultado)
                          VALUES (?, ?, ?)''',
-                      (deposit_id, time.time(), resultado))
+                      (deposit_id, time.time(), resultado.value))
             self.conn.commit()
             logger.info(f"✅ Interação registrada no banco '{self.db_path}'.")
         except Exception as e:
