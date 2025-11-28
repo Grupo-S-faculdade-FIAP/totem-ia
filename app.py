@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from re import DEBUG
-from database.db import save_deposit_data
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import openai
@@ -18,13 +17,15 @@ import joblib
 from datetime import datetime
 from pathlib import Path
 
+from src.database.db import save_deposit_data
+
 from dotenv import load_dotenv
 
 
 # Importar agents e prompts
 # from prompts.agents_config import get_agent
 
-from src.modules.image import classify_image, load_classifier, MODEL, SCALER
+from src.modules.image import classify_image, load_classifier
 
 from src.hardware.esp32 import ESP32_API_URL, get_esp32_sensors, calculate_environmental_impact, check_esp32_mechanical, confirm_esp32_detection
 
@@ -78,17 +79,16 @@ hf_token = os.getenv('HUGGINGFACE_TOKEN')
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    model_loaded = MODEL is not None and SCALER is not None
+    # model_loaded = MODEL is not None and SCALER is not None
+    # return jsonify({
+    #     'status': 'ok' if model_loaded else 'erro',
+    #     'model_loaded': model_loaded,
+    #     'timestamp': datetime.now().isoformat()
+    # })
     return jsonify({
-        'status': 'ok' if model_loaded else 'erro',
-        'model_loaded': model_loaded,
+        'status': 'ok',
         'timestamp': datetime.now().isoformat()
     })
-    # return jsonify({
-    #     'status': 'ok',
-    #     'timestamp': datetime.now().isoformat()
-    #     # 'model_loaded': model_loaded,
-    # })
 
 @app.route('/')
 def index():
@@ -863,8 +863,8 @@ if __name__ == '__main__':
     print("="*80)
     print()
 
-    # logger.info("Inicializando classificador...")
-    # MODEL, SCALER = load_classifier()
+    logger.info("Inicializando classificador...")
+    MODEL, SCALER = load_classifier()
     
     if MODEL is None or SCALER is None:
         print("AVISO: Modelo nao carregado!")

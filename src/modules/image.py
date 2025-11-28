@@ -11,9 +11,10 @@ import numpy as np  # pyright: ignore[reportMissingImports]
 logger = logging.getLogger(__name__)
 
 
-MODEL, SCALER = None, None
+# MODEL, SCALER = None, None
 
 def load_classifier():
+    
     try:
         model_path = Path('models/svm/svm_model_complete.pkl')
         scaler_path = Path('models/svm/scaler_complete.pkl')
@@ -93,7 +94,6 @@ def classify_image(image, is_debug_mode=False):
     try:
         logger.info(f"📸 Iniciando classificação. Imagem shape: {image.shape if image is not None else 'None'}")
         
-        # Verificar se cv2 está disponível
         if not hasattr(cv2, 'cvtColor'):
             logger.error("❌ ERRO CRÍTICO: cv2 módulo não está completo!")
             return None, None, None, "ERRO"
@@ -145,6 +145,6 @@ def classify_image(image, is_debug_mode=False):
         return None, None, None, "ERRO"
 
 
-if __name__ == "__main__":
-    logger.info("Inicializando classificador...")
-    MODEL, SCALER = load_classifier()
+# if __name__ == "__main__":
+#     logger.info("Inicializando classificador...")
+#     MODEL, SCALER = load_classifier()
