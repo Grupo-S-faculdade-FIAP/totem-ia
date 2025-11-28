@@ -538,7 +538,7 @@
                 </thead>
                 <tbody id="depositsTable">
                     <tr>
-                        <td colspan="6" class="loading">
+                        <td colspan="5" class="loading">
                             <div class="spinner"></div>
                         </td>
                     </tr>
@@ -751,7 +751,9 @@
                 row.innerHTML = `
                     <td>#${deposit.id}</td>
                     <td>${new Date(deposit.timestamp * 1000).toLocaleString('pt-BR')}</td>
-                    <td><span class="status-badge success Aceita</span></td>
+                    <td>
+                        <span class="status-badge success">Aceita</span>
+                    </td>
                     <td>${deposit.ml_confidence}%</td>
                     <td>
                         <div class="action-buttons">
