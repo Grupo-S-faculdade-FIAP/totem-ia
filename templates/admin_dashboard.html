@@ -743,11 +743,6 @@
                 // const statusClass = deposit.status === 'aceita' ? 'success' : 'error';
                 // const statusText = deposit.status === 'aceita' ? 'Aceita' : 'Rejeitada';
 
-                // <th>ID</th>
-                // <th>Horário</th>
-                // <th>Status</th>
-                // <th>Confiança</th>
-                // <th>Ações</th>
                 row.innerHTML = `
                     <td>#${deposit.id}</td>
                     <td>${new Date(deposit.timestamp * 1000).toLocaleString('pt-BR')}</td>
