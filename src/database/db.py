@@ -8,8 +8,7 @@ logger = logging.getLogger(__name__)
 def init_db():
 
     try:
-
-        conn = sqlite3.connect('totem_data.db', autocommit=True)
+        conn = sqlite3.connect('totem_data.db')
         c = conn.cursor()
         
         # [*Validate*] Confirmar sucesso da operação no banco?
@@ -23,7 +22,9 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )''')
 
+        conn.commit()
         conn.close()
+        logger.info(f"✅ Tabela 'deposits' criada com sucesso.")
     except Exception as e:
         logger.error(f"❌ Erro ao criar tabela: {e}")
 

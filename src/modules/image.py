@@ -31,12 +31,17 @@ class ImageClassifier:
             model = joblib.load(str(model_path))
             scaler = joblib.load(str(scaler_path))
             logger.info("✅ Modelo SVM carregado com sucesso!")
-            return model, scaler
+            # return model, scaler
+            self.model = model
+            self.scaler = scaler
         except Exception as e:
+            print("AVISO: Modelo nao carregado!")
             logger.error(f"❌ Erro ao carregar modelo: {e}")
             import traceback
             traceback.print_exc()
-            return None, None
+            # return None, None
+            self.model = None
+            self.scaler = None
 
 
     def extract_color_features(self, image):

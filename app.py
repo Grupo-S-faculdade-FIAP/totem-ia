@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from re import DEBUG
+from tkinter import Image
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import openai
@@ -64,8 +65,7 @@ else:
 ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
 
 # Inicializar classificador
-image_classifier = ImageClassifier()
-image_classifier.load_classifier()
+image_classifier: ImageClassifier | None 
 
 # Rota para servir imagem de teste (para simulador ESP32)
 @app.route('/test_tampinha.jpg')
@@ -85,7 +85,6 @@ hf_token = os.getenv('HUGGINGFACE_TOKEN')
 def health():
     return jsonify({
         'status': 'ok',
-        'model_loaded': image_classifier.model is not None and image_classifier.scaler is not None,
         'timestamp': datetime.now().isoformat()
     })
 
@@ -202,7 +201,7 @@ def api_classify():
         if image is None:
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
-        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG)
+        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if image_classifier else (None, None, None, None)
 
         if pred is None:
             return jsonify({
@@ -217,8 +216,8 @@ def api_classify():
             'status': 'sucesso' if is_tampinha else 'rejeitado',
             'is_tampinha': is_tampinha,
             'classification': 'TAMPINHA ACEITA!' if is_tampinha else 'NAO E TAMPINHA',
-            'confidence': float(conf),
-            'saturation': float(sat),
+            'confidence': float(conf) if conf is not None else None,
+            'saturation': float(sat) if sat is not None else None,
             'method': method,
             'timestamp': datetime.now().isoformat()
         }
@@ -341,7 +340,7 @@ def api_validate_complete():
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
         # ========== ETAPA 1: Classificação Software ==========
-        pred, conf, sat, method = image_classifier.classify_image(image)
+        pred, conf, sat, method = image_classifier.classify_image(image) if image_classifier else (None, None, None, None)
         
         if pred is None:
             return jsonify({
@@ -360,11 +359,11 @@ def api_validate_complete():
                 'stage': 'classificacao',
                 'message': 'Item rejeitado - Não é tampinha',
                 'classification': 'NAO E TAMPINHA',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'timestamp': datetime.now().isoformat()
             }), 200
 
-        logger.info(f"✅ Classificação OK: TAMPINHA (conf: {conf:.2f})")
+        logger.info(f"✅ Classificação OK: TAMPINHA (conf: {conf:.2f if conf is not None else 'N/A'})")
 
         # ========== ETAPA 2: Validação Mecânica (ESP32) ==========
         logger.info("📡 Enviando para validação mecânica no ESP32...")
@@ -424,8 +423,8 @@ def api_validate_complete():
                 'classificacao': {
                     'status': 'sucesso',
                     'is_tampinha': True,
-                    'confidence': float(conf),
-                    'saturation': float(sat),
+                    'confidence': float(conf) if conf is not None else None,
+                    'saturation': float(sat) if sat is not None else None,
                     'method': method
                 },
                 'mecanica': {
@@ -518,7 +517,7 @@ def validate_mechanical():
             }), 400
         
         # 3. Classificar com SVM
-        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG)
+        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if image_classifier else (None, None, None, None)
         
         if pred is None:
             return jsonify({
@@ -533,7 +532,7 @@ def validate_mechanical():
             return jsonify({
                 'status': 'Objeto não é tampinha',
                 'validation': 'FAIL',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'message': 'Por favor, deposite apenas tampinhas!'
             }), 400
         
@@ -569,7 +568,7 @@ def validate_mechanical():
                 'error': f'Erro ao comunicar com ESP32: {str(e)}',
                 'validation': 'OK',
                 'mechanical': 'UNKNOWN',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'message': 'Erro na verificação mecânica. Tente novamente.'
             }), 500
         
@@ -587,7 +586,7 @@ def validate_mechanical():
                 'status': 'Depósito autorizado!',
                 'validation': 'OK',
                 'mechanical': 'OK',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'impacto': impact,
                 'message': '✅ Tampinha depositada com sucesso!',
                 'presence': presence,
@@ -602,7 +601,7 @@ def validate_mechanical():
                 'status': 'Erro na verificação mecânica',
                 'validation': 'OK',
                 'mechanical': 'FAIL',
-                'confidence': float(conf),
+                'confidence': float(conf) if conf is not None else None,
                 'presence': presence,
                 'weight_ok': weight_ok,
                 'message': 'Falha ao detectar tampinha no depósito. Tente novamente.',
@@ -862,11 +861,8 @@ if __name__ == '__main__':
     print("="*80)
     print()
 
-
-    if image_classifier.model is None or image_classifier.scaler is None:
-        print("AVISO: Modelo nao carregado!")
-        logger.error("AVISO: Modelo nao carregado!")
-    
+    image_classifier = ImageClassifier()
+    image_classifier.load_classifier()
     
     print("Servidor iniciando em http://0.0.0.0:5003")
     print("   Acesse http://localhost:5003 no navegador")
