@@ -12,9 +12,9 @@ Link apresentação: https://youtu.be/LTQljfnJWdM
 ## 👥 *Integrantes do Grupo*
 •⁠  ⁠*Caroline Correa*
 •⁠  ⁠*Tiago Lindgren*
-•⁠  ⁠*Marcelo Mizuta*
-•⁠  ⁠*Gabriel Marques*
-•⁠  ⁠*Vinicius Vinha*
+•⁠  ⁠*Rodrigo Dias*
+•⁠  ⁠*Enzo França*
+•⁠  ⁠*Lucas Koyama*
 
 ---
 
