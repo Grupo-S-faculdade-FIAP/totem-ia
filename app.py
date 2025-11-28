@@ -433,8 +433,8 @@ def api_validate_complete():
 
         if db_connection:
             with db_connection as db:
-                peso_kg = esp32_check.get('peso', 0) / 1000.0 / 1000.0
-                deposit_id = db.save_deposit_data(conf, presenca, True, peso_kg, 0)
+                
+                deposit_id = db.save_deposit_data(conf, True, True, 2500, True)
 
                 db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO, deposit_id)
 
