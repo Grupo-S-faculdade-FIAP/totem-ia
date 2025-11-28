@@ -64,8 +64,8 @@ else:
 # Configuração ESP32 LOCAL (para fallback)
 ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
 
-image_classifier: ImageClassifier | None 
-db_connection: DatabaseConnection | None
+image_classifier: ImageClassifier | None = None
+db_connection: DatabaseConnection | None = None
 
 # Rota para servir imagem de teste (para simulador ESP32)
 @app.route('/test_tampinha.jpg')
@@ -430,9 +430,15 @@ def api_validate_complete():
         
         # Confirmar detecção
         confirm_esp32_detection('tampinha', float(conf) if conf is not None else 0.0)
+
         if db_connection:
             with db_connection as db:
-                db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO)
+                peso_kg = esp32_check.get('peso', 0) / 1000.0 / 1000.0
+                deposit_id = db.save_deposit_data(conf, presenca, True, peso_kg, 0)
+
+                db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO, deposit_id)
+
+                
         else:
             logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
 
@@ -914,9 +920,8 @@ if __name__ == '__main__':
     print()
 
     try:
-        from src.database.db import DatabaseConnection
-        with DatabaseConnection() as db:
-            db.init_db()
+        db_connection = DatabaseConnection()
+        db_connection.init_db()
         app.run(host='0.0.0.0', port=5005, debug=False, use_reloader=False)
     except KeyboardInterrupt:
         print("\nServidor interrompido pelo usuario.")
