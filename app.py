@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 # Importar agents e prompts
 # from prompts.agents_config import get_agent
 
-from src.modules.image import classify_image, load_classifier
+from src.modules.image import ImageClassifier
 
 from src.hardware.esp32 import ESP32_API_URL, get_esp32_sensors, calculate_environmental_impact, check_esp32_mechanical, confirm_esp32_detection
 
@@ -63,6 +63,10 @@ else:
 # Configuração ESP32 LOCAL (para fallback)
 ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
 
+# Inicializar classificador
+image_classifier = ImageClassifier()
+image_classifier.load_classifier()
+
 # Rota para servir imagem de teste (para simulador ESP32)
 @app.route('/test_tampinha.jpg')
 def serve_test_image():
@@ -79,14 +83,9 @@ hf_token = os.getenv('HUGGINGFACE_TOKEN')
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    # model_loaded = MODEL is not None and SCALER is not None
-    # return jsonify({
-    #     'status': 'ok' if model_loaded else 'erro',
-    #     'model_loaded': model_loaded,
-    #     'timestamp': datetime.now().isoformat()
-    # })
     return jsonify({
         'status': 'ok',
+        'model_loaded': image_classifier.model is not None and image_classifier.scaler is not None,
         'timestamp': datetime.now().isoformat()
     })
 
@@ -203,7 +202,7 @@ def api_classify():
         if image is None:
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
-        pred, conf, sat, method = classify_image(image, is_debug_mode=MODO_DEBUG)
+        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG)
 
         if pred is None:
             return jsonify({
@@ -342,7 +341,7 @@ def api_validate_complete():
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
         # ========== ETAPA 1: Classificação Software ==========
-        pred, conf, sat, method = classify_image(image)
+        pred, conf, sat, method = image_classifier.classify_image(image)
         
         if pred is None:
             return jsonify({
@@ -519,7 +518,7 @@ def validate_mechanical():
             }), 400
         
         # 3. Classificar com SVM
-        pred, conf, sat, method = classify_image(image, is_debug_mode=MODO_DEBUG)
+        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG)
         
         if pred is None:
             return jsonify({
@@ -863,16 +862,11 @@ if __name__ == '__main__':
     print("="*80)
     print()
 
-    logger.info("Inicializando classificador...")
-    MODEL, SCALER = load_classifier()
-    
-    if MODEL is None or SCALER is None:
+
+    if image_classifier.model is None or image_classifier.scaler is None:
         print("AVISO: Modelo nao carregado!")
-        print("   O servidor ira retornar erros ao tentar classificar.")
-        print("   Verifique se os arquivos existem:")
-        print("   - models/svm/svm_model_complete.pkl")
-        print("   - models/svm/scaler_complete.pkl")
-        print()
+        logger.error("AVISO: Modelo nao carregado!")
+    
     
     print("Servidor iniciando em http://0.0.0.0:5003")
     print("   Acesse http://localhost:5003 no navegador")
