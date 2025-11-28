@@ -110,19 +110,19 @@ def get_esp32_sensors():
     logger.info("🔌 ESP32: Lendo sensores...")
     result = call_esp32_api('/api/sensors', 'GET')
     if result:
-        logger.info(f"ESP32 Sensores: Presença={result.get('presenca')}, Peso={result.get('peso')}, Temp={result.get('temperatura')}")
+        logger.info(f"✅ ESP32 Sensores: Presença={result.get('presenca')}, Peso={result.get('peso')}, Temp={result.get('temperatura')}")
     return result
 
 
 def confirm_esp32_detection(detection_type, confidence):
     """Confirma detecção na API ESP32"""
-    logger.info(f"ESP32: Confirmando detecção (tipo={detection_type}, confiança={confidence})...")
+    logger.info(f"✔️  ESP32: Confirmando detecção (tipo={detection_type}, confiança={confidence})...")
     result = call_esp32_api('/api/confirm_detection', 'POST', {
         'detection_type': detection_type,
         'confidence': float(confidence)
     })
     if result:
-        logger.info(f"ESP32: Detecção confirmada - {result.get('status')}")
+        logger.info(f"✅ ESP32: Detecção confirmada - {result.get('status')}")
     return result
 
 

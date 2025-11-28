@@ -1,5 +1,7 @@
 # TOTEM IA - Sistema de Depósito Inteligente de Tampinhas
 
+Link apresentação: https://youtu.be/LTQljfnJWdM
+
 ## 🎯 Challenge FlexMedia - FIAP
 
 **Turma:** Desenvolvimento de Soluções IoT com IA  
