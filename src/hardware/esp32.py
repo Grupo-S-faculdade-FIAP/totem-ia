@@ -20,7 +20,7 @@ esp32_jwt_token = None
 esp32_token_expiry = None
 
 
-def get_esp32_jwt_token():
+def get_esp32_jwt_token() -> str | None:
     """Obtém um token JWT válido da API ESP32"""
     global esp32_jwt_token, esp32_token_expiry
 
@@ -63,7 +63,7 @@ def get_esp32_jwt_token():
         return None
 
 
-def call_esp32_api(endpoint, method='GET', data=None):
+def call_esp32_api(endpoint: str, method: str = 'GET', data: dict | None = None) -> dict | None:
     """Realiza chamada à API ESP32 com autenticação JWT"""
     token = get_esp32_jwt_token()
     
@@ -105,7 +105,7 @@ def call_esp32_api(endpoint, method='GET', data=None):
         return None
 
 
-def get_esp32_sensors():
+def get_esp32_sensors() -> dict | None:
     """Obtém leitura dos sensores do ESP32"""
     logger.info("🔌 ESP32: Lendo sensores...")
     result = call_esp32_api('/api/sensors', 'GET')
@@ -114,7 +114,7 @@ def get_esp32_sensors():
     return result
 
 
-def confirm_esp32_detection(detection_type, confidence):
+def confirm_esp32_detection(detection_type: str, confidence: float) -> dict | None:
     """Confirma detecção na API ESP32"""
     logger.info(f"✔️  ESP32: Confirmando detecção (tipo={detection_type}, confiança={confidence})...")
     result = call_esp32_api('/api/confirm_detection', 'POST', {
@@ -126,7 +126,7 @@ def confirm_esp32_detection(detection_type, confidence):
     return result
 
 
-def check_esp32_mechanical(presenca, peso):
+def check_esp32_mechanical(presenca: bool, peso: float) -> dict | None:
     """Verifica detecção mecânica no ESP32"""
     logger.info(f"⚙️  ESP32: Verificando condição mecânica (presença={presenca}, peso={peso})...")
     result = call_esp32_api('/api/check_mechanical', 'POST', {
@@ -138,7 +138,7 @@ def check_esp32_mechanical(presenca, peso):
     return result
 
 
-def calculate_environmental_impact():
+def calculate_environmental_impact() -> dict[str, float]:
     """Calcula e retorna impacto ambiental por tampinha"""
     return {
         'plastico_reciclado_g': 0.5,

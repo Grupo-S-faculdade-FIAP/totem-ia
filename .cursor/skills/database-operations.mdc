@@ -1,0 +1,119 @@
+---
+description: Skill para operações de banco de dados SQLite no padrão do projeto
+globs: ["src/database/**/*.py"]
+alwaysApply: false
+---
+
+# 💾 Skill: Banco de Dados — TOTEM IA
+
+## Quando Usar
+Ao criar novas tabelas, queries ou operações de persistência.
+
+## Padrão Context Manager
+
+Sempre usar `DatabaseConnection` com context manager:
+
+```python
+# ✅ Correto
+if db_connection:
+    with db_connection as db:
+        result = db.save_deposit_data(conf, presence, weight_ok, weight_value, plastico)
+        db.save_interaction(ResultadoInteracao.SUCESSO, result)
+else:
+    logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
+```
+
+## Nova Tabela
+
+```python
+def init_db(self):
+    c = self.conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS nova_tabela (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp REAL NOT NULL,
+        campo_texto TEXT,
+        campo_numerico REAL,
+        campo_booleano BOOLEAN,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )''')
+    self.conn.commit()
+```
+
+## Novo Método de Persistência
+
+```python
+def save_<entidade>(self, campo1: str, campo2: float) -> int | None:
+    """Salva <entidade> no banco de dados.
+    
+    Args:
+        campo1: Descrição do campo
+        campo2: Descrição do campo
+        
+    Returns:
+        ID do registro criado ou None em caso de erro
+    """
+    try:
+        if not self.conn:
+            self.__connect()
+        if not self.conn:
+            raise Exception("Conexão com o banco de dados não estabelecida.")
+
+        c = self.conn.cursor()
+        result = c.execute(
+            '''INSERT INTO <tabela> (timestamp, campo1, campo2)
+               VALUES (?, ?, ?)''',
+            (time.time(), campo1, campo2)
+        )
+        self.conn.commit()
+        logger.info(f"✅ <Entidade> salva no banco (ID: {result.lastrowid})")
+        return result.lastrowid
+    except Exception as e:
+        logger.error(f"❌ Erro ao salvar <entidade>: {e}")
+        return None
+```
+
+## Novo Método de Consulta
+
+```python
+def get_<entidades>(self, filtro: str | None = None) -> list[dict]:
+    """Recupera <entidades> do banco de dados.
+    
+    Returns:
+        Lista de dicionários com os dados
+    """
+    try:
+        if not self.conn:
+            self.__connect()
+
+        c = self.conn.cursor()
+        query = '''SELECT id, timestamp, campo1, campo2 
+                   FROM <tabela> ORDER BY timestamp DESC'''
+        
+        if filtro:
+            query += ' WHERE campo1 = ?'
+            c.execute(query, (filtro,))
+        else:
+            c.execute(query)
+        
+        rows = c.fetchall()
+        return [
+            {
+                'id': row[0],
+                'timestamp': row[1],
+                'campo1': row[2],
+                'campo2': row[3]
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        logger.error(f"❌ Erro ao buscar <entidades>: {e}")
+        return []
+```
+
+## Regras Importantes
+
+- Queries sempre parametrizadas com `?` (nunca f-strings em SQL)
+- Retornar `None` ou lista vazia em caso de erro (nunca levantar exceção para o caller)
+- `self.conn.commit()` após INSERT/UPDATE/DELETE
+- Verificar `self.conn` antes de operar
+- Usar `time.time()` para timestamps numéricos

@@ -1,0 +1,122 @@
+---
+description: Skill para pipeline de Machine Learning e Visão Computacional
+globs: ["src/modules/**/*.py", "src/models_classifiers/**/*.py", "src/models_trainers/**/*.py"]
+alwaysApply: false
+---
+
+# 🤖 Skill: Pipeline ML / Visão Computacional — TOTEM IA
+
+## Quando Usar
+Ao criar ou modificar classificadores, extratores de features ou pipelines de treinamento.
+
+## Arquitetura do Pipeline
+
+```
+Imagem (bytes) → cv2.imdecode → resize(128,128) → extract_features → scaler.transform → model.predict → resultado
+```
+
+## Extração de Features
+
+O modelo SVM atual usa 8 features. Para manter compatibilidade:
+
+```python
+def extract_color_features(self, image: np.ndarray) -> np.ndarray | None:
+    """Extrai features de cor da imagem para o SVM.
+    
+    Features:
+        [0-2]: Mean, Std, Median do canal B (BGR)
+        [3-5]: Mean, Std, Median do canal G (BGR)
+        [6]:   Saturação média (HSV)
+        [7]:   Contraste geral (desvio padrão grayscale)
+    """
+    image = cv2.resize(image, (128, 128))
+    features = []
+    
+    # Canais BGR
+    for channel in cv2.split(image)[:2]:  # B e G
+        features.extend([np.mean(channel), np.std(channel), np.median(channel)])
+    
+    # HSV saturação
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    features.append(np.mean(hsv[:, :, 1]))
+    
+    # Contraste
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    features.append(np.std(gray))
+    
+    return np.array(features)
+```
+
+## Novo Classificador
+
+Ao criar um novo classificador, seguir a interface:
+
+```python
+class NovoClassifier:
+    def __init__(self):
+        self.model = None
+        self.scaler = None
+    
+    def load_classifier(self) -> None:
+        """Carrega modelo e scaler do disco."""
+        ...
+    
+    def classify_image(
+        self, 
+        image: np.ndarray, 
+        is_debug_mode: bool = False
+    ) -> tuple[int | None, float | None, float | None, str]:
+        """
+        Classifica uma imagem.
+        
+        Returns:
+            (prediction, confidence, saturation, method)
+            prediction: 1=tampinha, 0=não-tampinha, None=erro
+            confidence: 0.0-1.0
+            saturation: valor HSV médio
+            method: string identificando o caminho de decisão
+        """
+        ...
+```
+
+## Regras de Classificação (Saturação Híbrida)
+
+```
+saturation > 120  → TAMPINHA (SAT_HIGH, conf ≥ 0.90)
+saturation < 30   → NÃO-TAMPINHA (SAT_VERY_LOW, conf = 0.95)
+100 < sat ≤ 120   → Usar SVM (MID_HIGH_SAT)
+50 < sat ≤ 100    → TAMPINHA (NORMAL_SAT_TAMPINHA, conf = 0.80)
+30 ≤ sat ≤ 50     → TAMPINHA (LOW_SAT_FORCE_TAMPINHA, conf = 0.75)
+DEBUG + sat > 50   → TAMPINHA (DEBUG_MODE, conf = 0.95)
+```
+
+## Treinamento de Modelo
+
+```python
+# Template para novo treinador em src/models_trainers/
+from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+import joblib
+
+# 1. Carregar dados
+X_train, y_train = load_dataset()
+
+# 2. Normalizar
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X_train)
+
+# 3. Treinar
+model = SVC(kernel='rbf', probability=True)
+model.fit(X_scaled, y_train)
+
+# 4. Salvar
+joblib.dump(model, 'models/svm/svm_model_complete.pkl')
+joblib.dump(scaler, 'models/svm/scaler_complete.pkl')
+```
+
+## Boas Práticas
+
+- Processar imagens **em memória** (np.frombuffer), nunca salvar em disco temporário
+- Reutilizar conversões de color space (não chamar cvtColor múltiplas vezes para o mesmo espaço)
+- Features devem ser determinísticas (mesma imagem → mesmo vetor)
+- Validar shape/tipo da imagem antes de processar

@@ -1,6 +1,7 @@
 import logging
+import traceback
+
 import cv2  # pyright: ignore[reportMissingImports]
-import logging
 # import requests 
 import joblib  # pyright: ignore[reportMissingImports]
 from pathlib import Path
@@ -35,26 +36,17 @@ class ImageClassifier:
             self.model = model
             self.scaler = scaler
         except Exception as e:
-            print("AVISO: Modelo nao carregado!")
-            logger.error(f"❌ Erro ao carregar modelo: {e}")
-            import traceback
-            traceback.print_exc()
-            # return None, None
+            logger.error(f"❌ Erro ao carregar modelo: {e}", exc_info=True)
             self.model = None
             self.scaler = None
 
 
-    def extract_color_features(self, image):
+    def extract_color_features(self, image: np.ndarray) -> np.ndarray | None:
         try:
             logger.debug(f"🔍 extract_color_features iniciada. Image type: {type(image)}, shape: {image.shape if hasattr(image, 'shape') else 'N/A'}")
             
             if not isinstance(image, np.ndarray):
                 logger.error(f"❌ Imagem não é numpy array! Tipo: {type(image)}")
-                return None
-            
-            # Verificar cv2
-            if 'cv2' not in globals():
-                logger.error("❌ cv2 não está em globals()")
                 return None
                 
             image = cv2.resize(image, (128, 128))
@@ -94,7 +86,7 @@ class ImageClassifier:
             return None
 
 
-    def classify_image(self, image, is_debug_mode=False):
+    def classify_image(self, image: np.ndarray | None, is_debug_mode: bool = False) -> tuple[int | None, float | None, float | None, str]:
         if image is None or self.model is None or self.scaler is None:
             logger.error(f"⚠️ Prerequisitos faltando: image={image is not None}, MODEL={self.model is not None}, SCALER={self.scaler is not None}")
             return None, None, None, "ERRO"

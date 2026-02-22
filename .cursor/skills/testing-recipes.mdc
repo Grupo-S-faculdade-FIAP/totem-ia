@@ -1,0 +1,159 @@
+---
+description: Skill para escrever testes unitários e de integração com pytest
+globs: ["test_*.py", "tests/**/*.py"]
+alwaysApply: false
+---
+
+# 🧪 Skill: Escrevendo Testes — TOTEM IA
+
+## Quando Usar
+Ao criar novos testes ou adicionar cobertura a módulos existentes.
+
+## Setup do Test Client Flask
+
+```python
+import pytest
+from unittest.mock import MagicMock, patch
+from app import app
+
+@pytest.fixture
+def client():
+    """Client Flask para testes de rotas."""
+    app.config['TESTING'] = True
+    with app.test_client() as client:
+        yield client
+```
+
+## Testar Rota de Classificação
+
+```python
+import base64
+import numpy as np
+import cv2
+
+def create_test_image(width=128, height=128, color=(0, 128, 255)):
+    """Cria imagem de teste com cor específica."""
+    image = np.full((height, width, 3), color, dtype=np.uint8)
+    _, buffer = cv2.imencode('.jpg', image)
+    return base64.b64encode(buffer).decode('utf-8')
+
+def test_classify_returns_success_for_valid_image(client):
+    """Testar que /api/classify aceita imagem base64 válida."""
+    image_b64 = create_test_image(color=(0, 200, 255))  # Alta saturação
+    
+    with patch('app.image_classifier') as mock_clf:
+        mock_clf.classify_image.return_value = (1, 0.95, 150.0, "SAT_HIGH")
+        
+        response = client.post('/api/classify', json={
+            'image': f'data:image/jpeg;base64,{image_b64}'
+        })
+    
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['status'] == 'sucesso'
+    assert data['is_tampinha'] is True
+
+def test_classify_returns_error_without_image(client):
+    """Testar que /api/classify rejeita request sem imagem."""
+    response = client.post('/api/classify', json={})
+    assert response.status_code == 400
+```
+
+## Testar ImageClassifier
+
+```python
+from src.modules.image import ImageClassifier
+
+@pytest.fixture
+def classifier():
+    clf = ImageClassifier()
+    clf.model = MagicMock()
+    clf.scaler = MagicMock()
+    clf.model.predict.return_value = [1]
+    clf.model.decision_function.return_value = [2.5]
+    clf.scaler.transform.return_value = [[0.5] * 8]
+    return clf
+
+def test_classify_high_saturation_returns_tampinha(classifier):
+    """Saturação > 120 deve retornar TAMPINHA."""
+    # Criar imagem com alta saturação (cor viva)
+    image = np.full((128, 128, 3), (0, 200, 255), dtype=np.uint8)
+    
+    pred, conf, sat, method = classifier.classify_image(image)
+    
+    assert pred == 1
+    assert conf >= 0.90
+    assert method == "SAT_HIGH"
+
+def test_classify_none_image_returns_error(classifier):
+    """Imagem None deve retornar erro."""
+    pred, conf, sat, method = classifier.classify_image(None)
+    
+    assert pred is None
+    assert method == "ERRO"
+```
+
+## Testar DatabaseConnection
+
+```python
+from src.database.db import DatabaseConnection
+
+@pytest.fixture
+def test_db(tmp_path):
+    """Banco de dados temporário para testes."""
+    db_path = str(tmp_path / "test.db")
+    db = DatabaseConnection(db_path)
+    db.init_db()
+    return db
+
+def test_save_deposit_returns_id(test_db):
+    with test_db as db:
+        deposit_id = db.save_deposit_data(0.95, True, True, 2500, 0.5)
+    assert deposit_id is not None
+    assert isinstance(deposit_id, int)
+
+def test_save_interaction_succeeds(test_db):
+    with test_db as db:
+        db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO)
+    # Não deve levantar exceção
+```
+
+## Testar ESP32 (Mockado)
+
+```python
+from src.hardware.esp32 import get_esp32_sensors, check_esp32_mechanical
+
+@patch('src.hardware.esp32.call_esp32_api')
+def test_get_sensors_returns_data(mock_api):
+    mock_api.return_value = {'presenca': True, 'peso': 2600, 'temperatura': 25}
+    
+    result = get_esp32_sensors()
+    
+    assert result is not None
+    assert result['presenca'] is True
+    assert result['peso'] == 2600
+
+@patch('src.hardware.esp32.call_esp32_api')
+def test_get_sensors_returns_none_when_offline(mock_api):
+    mock_api.return_value = None
+    
+    result = get_esp32_sensors()
+    
+    assert result is None
+```
+
+## Executar Testes
+
+```bash
+# Todos os testes
+pytest -v
+
+# Com cobertura
+pytest --cov=src --cov-report=term-missing
+
+# Apenas um arquivo
+pytest test_classify.py -v
+
+# Apenas testes que contêm "database"
+pytest -k "database" -v
+```

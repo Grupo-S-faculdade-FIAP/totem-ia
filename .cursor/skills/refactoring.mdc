@@ -1,0 +1,109 @@
+---
+description: Skill para refatoração segura de código existente
+globs: ["**/*.py"]
+alwaysApply: false
+---
+
+# 🔧 Skill: Refatoração — TOTEM IA
+
+## Quando Usar
+Ao melhorar código existente sem alterar comportamento externo.
+
+## Checklist de Refatoração Segura
+
+1. **Antes de refatorar**: garantir que há testes cobrindo o código
+2. **Durante**: manter assinatura pública inalterada (ou atualizar todos os callers)
+3. **Depois**: rodar todos os testes (`pytest -v`)
+
+## Padrões Comuns de Refatoração
+
+### 1. Extrair Método (quando função tem > 30 linhas)
+
+```python
+# ❌ Antes: rota faz tudo
+@app.route('/api/classify', methods=['POST'])
+def api_classify():
+    # 50+ linhas de processamento...
+
+# ✅ Depois: delegar para funções auxiliares
+def _parse_image_from_request(request) -> np.ndarray | None:
+    """Extrai imagem do request (base64 ou file upload)."""
+    ...
+
+def _build_classification_response(pred, conf, sat, method) -> dict:
+    """Constrói resposta padronizada de classificação."""
+    ...
+
+@app.route('/api/classify', methods=['POST'])
+def api_classify():
+    image = _parse_image_from_request(request)
+    if image is None:
+        return jsonify({'error': 'Imagem inválida'}), 400
+    
+    pred, conf, sat, method = image_classifier.classify_image(image)
+    return jsonify(_build_classification_response(pred, conf, sat, method))
+```
+
+### 2. Eliminar Código Duplicado
+
+```python
+# ❌ Antes: parsing de imagem repetido em 3 rotas
+# /api/classify, /api/validate-complete, /api/validate_mechanical
+
+# ✅ Depois: função única reutilizada
+def parse_image_from_request() -> tuple[np.ndarray | None, str | None]:
+    """Parse de imagem unificado para todas as rotas.
+    
+    Returns:
+        (image, error_message) — image é None se houver erro
+    """
+    ...
+```
+
+### 3. Substituir Magic Numbers
+
+```python
+# ❌ Antes
+if peso >= 2400 and peso <= 2800:
+if saturation > 120:
+
+# ✅ Depois
+PESO_MIN_TAMPINHA = 2400
+PESO_MAX_TAMPINHA = 2800
+SATURACAO_ALTA_THRESHOLD = 120
+
+if PESO_MIN_TAMPINHA <= peso <= PESO_MAX_TAMPINHA:
+if saturation > SATURACAO_ALTA_THRESHOLD:
+```
+
+### 4. Consolidar Conexões DB
+
+```python
+# ❌ Antes: abrir nova conexão em cada método de consulta
+def get_total_interacoes(self):
+    conn = sqlite3.connect('totem_data.db')  # Hardcoded!
+    ...
+
+# ✅ Depois: usar self.conn do context manager
+def get_total_interacoes(self) -> int:
+    if not self.conn:
+        self.__connect()
+    c = self.conn.cursor()
+    c.execute('SELECT COUNT(*) FROM interactions')
+    return c.fetchone()[0] or 0
+```
+
+## O Que NÃO Refatorar
+
+- Código que funciona e não será modificado em breve
+- Funções de terceiros (Flask, OpenCV, sklearn)
+- Código de configuração estática (constantes, enums)
+- Durante uma sprint de feature — separar em PR dedicado
+
+## Sinais de que Precisa Refatorar
+
+- Função com mais de 50 linhas
+- Mesmo bloco de código copiado em 3+ lugares
+- `import traceback` dentro de funções (deveria estar no topo)
+- Variáveis com nomes genéricos (`data`, `result`, `response`) reutilizadas
+- Muitos `if/else` aninhados (> 3 níveis)
