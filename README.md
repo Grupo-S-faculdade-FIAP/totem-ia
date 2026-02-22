@@ -1,5 +1,7 @@
 # TOTEM IA - Sistema de Depósito Inteligente de Tampinhas
 
+Link apresentação: https://youtu.be/LTQljfnJWdM
+
 ## 🎯 Challenge FlexMedia - FIAP
 
 **Turma:** Desenvolvimento de Soluções IoT com IA  
@@ -10,9 +12,9 @@
 ## 👥 *Integrantes do Grupo*
 •⁠  ⁠*Caroline Correa*
 •⁠  ⁠*Tiago Lindgren*
-•⁠  ⁠*Marcelo Mizuta*
-•⁠  ⁠*Gabriel Marques*
-•⁠  ⁠*Vinicius Vinha*
+•⁠  ⁠*Rodrigo Dias*
+•⁠  ⁠*Enzo França*
+•⁠  ⁠*Lucas Koyama*
 
 ---
 
@@ -98,6 +100,10 @@ Desenvolvemos uma solução inovadora de **totem inteligente para depósito de t
 
 ### Diagrama de Arquitetura (PlantUML)
 
+![Diagrama de Componentes do Totem IA](assets/Flexmedia_Diag.png)
+
+<!-- ### Diagrama de Arquitetura (PlantUML)
+
 O projeto inclui um **diagrama completo de componentes** criado em PlantUML (`totem_ia_diagram.puml`) que detalha:
 
 - **Pacotes do Sistema**: Frontend, Backend, IA, Dados e Infraestrutura
@@ -115,7 +121,7 @@ brew install plantuml
 plantuml totem_ia_diagram.puml
 
 # Ou usar extensão PlantUML no VS Code
-```
+``` -->
 
 ### Pipeline de Dados
 

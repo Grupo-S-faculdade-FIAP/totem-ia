@@ -1,0 +1,64 @@
+---
+description: Otimizações de performance para ML, I/O e resposta do servidor
+globs: ["**/*.py"]
+alwaysApply: false
+---
+
+# ⚡ Performance — TOTEM IA
+
+## Carregamento de Modelos ML
+
+- Carregar modelo SVM e scaler **uma única vez** na inicialização (`if __name__ == '__main__'`)
+- **Nunca** recarregar `joblib.load()` a cada request
+- Manter modelos em memória como atributos da classe `ImageClassifier`
+
+```python
+# ✅ Carregar uma vez
+image_classifier = ImageClassifier()
+image_classifier.load_classifier()  # Uma vez na startup
+
+# ❌ Nunca fazer isso por request
+@app.route('/api/classify')
+def classify():
+    model = joblib.load('model.pkl')  # Lento!
+```
+
+## Processamento de Imagem
+
+- Redimensionar imagem para `128x128` **antes** de extrair features (já feito)
+- Usar `np.frombuffer` para decodificar bytes (evitar I/O em disco)
+- Evitar salvar imagens em disco temporário — processar em memória
+- Para batch processing, usar `numpy` vetorizado ao invés de loops Python
+
+## Banco de Dados
+
+- Usar context manager (`with db_connection as db`) para garantir fechamento
+- Para consultas frequentes, considerar cache em memória (ex: contadores)
+- Evitar abrir/fechar conexão a cada query — reutilizar conexão dentro do context
+- Índices em colunas usadas em `WHERE` e `ORDER BY`
+
+## Comunicação ESP32
+
+- Cache do token JWT com expiração (`esp32_token_expiry`)
+- Timeout em todas as requests externas (já configurado: 5-15s)
+- Fallback para valores simulados quando ESP32 offline
+- Não bloquear o servidor esperando resposta do ESP32 indefinidamente
+
+## Respostas HTTP
+
+- Usar `Cache-Control` para assets estáticos (áudio, imagens)
+- Evitar reprocessar dados que não mudaram
+- Comprimir respostas JSON grandes com gzip (configurar no Flask/Gunicorn)
+
+## Áudio
+
+- Pré-gerar arquivos de áudio (não gerar em runtime)
+- Cachear com `max-age=3600` para arquivos estáticos
+- Usar streaming (`Accept-Ranges: bytes`) para arquivos grandes
+
+## Anti-Patterns a Evitar
+
+- `import` dentro de funções chamadas frequentemente (exceto para lazy loading intencional)
+- `traceback.format_exc()` em código de produção (custo de formatação)
+- Criar objetos NumPy desnecessários em loops
+- Múltiplas conversões de color space na mesma imagem (calcular uma vez, reutilizar)

@@ -1,0 +1,86 @@
+---
+description: Padrões de tratamento de erros e resiliência
+globs: ["**/*.py"]
+alwaysApply: true
+---
+
+# 🛡️ Tratamento de Erros — TOTEM IA
+
+## Padrão de Resposta de Erro
+
+Todas as respostas de erro devem seguir o formato:
+
+```python
+{
+    "status": "erro",
+    "error": "Descrição legível para o usuário",
+    "timestamp": datetime.now().isoformat()
+}
+```
+
+- **Nunca** retornar traceback ao usuário em produção
+- Logar traceback internamente com `logger.error(..., exc_info=True)`
+
+## Try/Except
+
+### Ser Específico
+```python
+# ✅ Capturar exceções específicas
+try:
+    response = requests.get(url, timeout=5)
+except requests.exceptions.ConnectionError:
+    logger.warning("ESP32 não acessível, usando fallback")
+    return fallback_response()
+except requests.exceptions.Timeout:
+    logger.error("Timeout ao conectar com ESP32")
+    return error_response("Timeout de conexão")
+
+# ❌ Evitar except genérico sem contexto
+try:
+    ...
+except Exception:
+    pass  # Nunca silenciar erros
+```
+
+### Hierarquia de Exceções
+1. Capturar exceções mais específicas primeiro
+2. `Exception` genérico apenas como último recurso
+3. **Nunca** capturar `BaseException` (inclui `KeyboardInterrupt`, `SystemExit`)
+
+## Fallbacks e Graceful Degradation
+
+- ESP32 offline → usar valores simulados e continuar
+- Modelo ML não carregado → retornar erro claro, não crash
+- Banco de dados indisponível → logar warning, continuar operação básica
+- Áudio não encontrado → criar placeholder silencioso
+
+```python
+# ✅ Padrão de fallback
+sensors = get_esp32_sensors()
+if not sensors:
+    logger.warning("⚠️ Sensores indisponíveis, usando valores padrão")
+    sensors = {'presenca': True, 'peso': 2600}
+```
+
+## Validação Precoce (Fail Fast)
+
+- Validar inputs no início da função/rota
+- Retornar erro 400 imediatamente se input inválido
+- Não processar dados parciais
+
+```python
+# ✅ Fail fast
+if image is None:
+    return jsonify({'error': 'Imagem inválida'}), 400
+
+if self.model is None:
+    logger.error("Modelo não carregado")
+    return None, None, None, "ERRO"
+```
+
+## Logs de Erro
+
+- `logger.error()` → erros que precisam de atenção (falha de processamento)
+- `logger.warning()` → situações recuperáveis (fallback ativado)
+- `logger.info()` → operações normais (classificação concluída)
+- Incluir contexto suficiente: valores de variáveis, IDs, timestamps

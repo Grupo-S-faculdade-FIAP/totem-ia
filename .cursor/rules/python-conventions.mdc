@@ -1,0 +1,52 @@
+---
+description: Convenções de código Python para o projeto TOTEM IA
+globs: ["**/*.py"]
+alwaysApply: true
+---
+
+# 🐍 Convenções Python — TOTEM IA
+
+## Estilo e Formatação
+
+- Seguir **PEP 8** como base (max 120 chars por linha)
+- Usar **type hints** em todas as funções públicas e métodos de classe
+- Docstrings em **português** no formato Google Style
+- Variáveis e funções em `snake_case`, classes em `PascalCase`, constantes em `UPPER_SNAKE_CASE`
+- Imports organizados: stdlib → terceiros → locais, separados por linha em branco
+
+## Tipos e Anotações
+
+```python
+# ✅ Correto
+def classify_image(self, image: np.ndarray, is_debug_mode: bool = False) -> tuple[int | None, float | None, float | None, str]:
+    ...
+
+# ❌ Evitar
+def classify_image(self, image, is_debug_mode=False):
+    ...
+```
+
+## Variáveis de Ambiente
+
+- Sempre usar `os.getenv('VAR', 'default')` com valor padrão
+- Nunca hardcodar credenciais, tokens ou chaves de API
+- Documentar novas variáveis no `env.example`
+
+## Logging
+
+- Usar `logger = logging.getLogger(__name__)` por módulo
+- Níveis: `DEBUG` para detalhes internos, `INFO` para fluxo normal, `WARNING` para fallbacks, `ERROR` para falhas
+- Incluir emojis padronizados: ✅ sucesso, ❌ erro, ⚠️ aviso, 📡 rede, 🔍 análise, 🐛 debug
+
+## Imports
+
+- **Nunca** importar `*` (wildcard imports)
+- Preferir imports absolutos a partir de `src/`, `prompts/`
+- Evitar imports circulares — se necessário, importar dentro da função
+
+## Boas Práticas
+
+- Usar `pathlib.Path` ao invés de `os.path` para manipulação de caminhos
+- Preferir f-strings a `.format()` ou `%`
+- Usar `Enum` para conjuntos fixos de valores (ex: `ResultadoInteracao`)
+- Evitar variáveis globais mutáveis; preferir injeção de dependência

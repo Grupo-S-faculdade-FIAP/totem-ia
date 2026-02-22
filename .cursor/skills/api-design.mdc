@@ -1,0 +1,74 @@
+---
+description: Skill para design de APIs RESTful no projeto
+globs: ["app.py"]
+alwaysApply: false
+---
+
+# 🔌 Skill: API Design — TOTEM IA
+
+## Quando Usar
+Ao projetar novos endpoints ou refatorar endpoints existentes.
+
+## Convenções de URL
+
+```
+GET  /api/health                → Health check
+GET  /api/esp32-health          → Health check do ESP32
+POST /api/classify              → Classificar imagem
+POST /api/validate-mechanical   → Validar mecânica (presença + peso)
+POST /api/validate-complete     → Classificação + mecânica completa
+POST /api/admin/login           → Autenticação admin
+GET  /api/admin/dashboard       → Dados do dashboard
+GET  /api/speech/sustainability → Áudio de sustentabilidade
+GET  /api/speech/info           → Info do áudio
+```
+
+### Padrão de Nomenclatura
+- `/api/<recurso>` para APIs REST
+- `/api/<dominio>/<acao>` para ações específicas
+- Usar kebab-case em URLs (`validate-mechanical`, não `validate_mechanical`)
+- Páginas HTML sem prefixo `/api/`
+
+## Status Codes
+
+| Code | Uso no Projeto |
+|------|---------------|
+| 200  | Sucesso, classificação aceita/rejeitada |
+| 400  | Input inválido, arquivo errado, campo ausente |
+| 401  | Login falhado |
+| 404  | Recurso não encontrado |
+| 500  | Erro interno (classificação, DB, etc.) |
+| 503  | ESP32 offline |
+
+## Fluxo Completo de Validação
+
+```
+Cliente → POST /api/validate-complete
+    ├── 1. Receber e decodificar imagem
+    ├── 2. Classificar com SVM (ImageClassifier)
+    │    ├── Não é tampinha → 200 { status: "rejeitado" }
+    │    └── É tampinha → continua
+    ├── 3. Verificar sensores ESP32
+    │    ├── ESP32 offline → usar valores simulados
+    │    └── ESP32 online → usar valores reais
+    ├── 4. Validar condições mecânicas
+    │    ├── Peso/presença falha → 200 { status: "erro_esp32" }
+    │    └── Aprovado → continua
+    ├── 5. Salvar no banco de dados
+    └── 6. Retornar → 200 { status: "sucesso", stages: {...} }
+```
+
+## Headers Importantes
+
+```python
+# Para áudio/streaming
+response.headers['Accept-Ranges'] = 'bytes'
+response.headers['Cache-Control'] = 'public, max-age=3600'
+response.headers['Access-Control-Allow-Origin'] = '*'
+```
+
+## Versionamento
+
+- Atualmente sem versionamento de API
+- Se necessário no futuro: `/api/v2/<recurso>`
+- Manter backward compatibility ao alterar endpoints existentes

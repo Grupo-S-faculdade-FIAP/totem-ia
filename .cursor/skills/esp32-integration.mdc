@@ -1,0 +1,126 @@
+---
+description: Skill para integração com hardware ESP32 e IoT
+globs: ["src/hardware/**/*.py"]
+alwaysApply: false
+---
+
+# 📡 Skill: Integração ESP32 / IoT — TOTEM IA
+
+## Quando Usar
+Ao criar ou modificar comunicação com o ESP32, sensores ou atuadores.
+
+## Arquitetura de Comunicação
+
+```
+Flask Server ←→ ESP32 API (Render/Local)
+                    ↕
+              ESP32 Hardware
+              ├── Sensor de presença
+              ├── Célula de carga (peso)
+              ├── Câmera (ESP32-CAM)
+              └── Esteira (servo motor)
+```
+
+## Autenticação JWT
+
+```python
+def call_esp32_api(endpoint: str, method: str = 'GET', data: dict | None = None) -> dict | None:
+    """
+    Chamada autenticada à API ESP32.
+    
+    1. Obtém token JWT (com cache)
+    2. Envia request com Authorization header
+    3. Retorna JSON ou None em caso de erro
+    """
+    token = get_esp32_jwt_token()
+    if not token:
+        return None
+    
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json'
+    }
+    
+    response = requests.request(method, f"{ESP32_API_URL}{endpoint}", 
+                                 json=data, headers=headers, timeout=10)
+    
+    if response.status_code in [200, 201]:
+        return response.json()
+    return None
+```
+
+## Nova Função de Hardware
+
+```python
+def <acao>_esp32_<componente>(<params>) -> dict | None:
+    """<Descrição da ação com o hardware>
+    
+    Args:
+        <params>: Descrição
+        
+    Returns:
+        Resposta da API ESP32 ou None em caso de erro
+    """
+    logger.info(f"📡 ESP32: <Ação> (<detalhes>)...")
+    result = call_esp32_api('/api/<endpoint>', '<METHOD>', {
+        'param1': valor1,
+        'param2': valor2
+    })
+    if result:
+        logger.info(f"✅ ESP32: <Ação> concluída - {result.get('status')}")
+    return result
+```
+
+## Fallback Pattern (ESP32 Offline)
+
+Sempre implementar fallback quando ESP32 não está disponível:
+
+```python
+try:
+    esp32_response = requests.post(
+        f'http://{ESP32_IP}/check_mechanical',
+        json={'validation': 'OK'},
+        timeout=5
+    )
+    esp32_data = esp32_response.json()
+    
+except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+    logger.warning("⚠️ ESP32 não acessível, usando simulação")
+    esp32_data = {
+        'presence_detected': True,
+        'weight_ok': True,
+        'weight_value': 2500,
+        'timestamp': int(time.time()),
+        'simulated': True  # Flag para identificar simulação
+    }
+```
+
+## Validação Mecânica
+
+Critérios para aceitar tampinha mecanicamente:
+- `presença == True` (sensor detectou objeto)
+- `2400 ≤ peso ≤ 2800` (gramas, faixa de tampinha plástica)
+
+```python
+is_valid = presenca and 2400 <= peso <= 2800
+```
+
+## Impacto Ambiental
+
+Valores por tampinha reciclada:
+```python
+{
+    'plastico_reciclado_g': 0.5,    # gramas de plástico
+    'co2_evitado_g': 2.3,           # gramas de CO2
+    'agua_economizada_ml': 15,      # mililitros de água
+    'arvores_preservadas_cm2': 8    # cm² de floresta
+}
+```
+
+## Regras
+
+- Timeout obrigatório em toda request HTTP ao ESP32 (5-15s)
+- Cache de JWT token para evitar login a cada chamada
+- Logar toda comunicação com emojis padronizados (📡, ✅, ❌)
+- Flag `simulated: True` quando usando dados simulados
+- Nunca bloquear o servidor principal esperando ESP32
