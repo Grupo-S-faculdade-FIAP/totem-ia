@@ -8,11 +8,27 @@ Combina:
 - Regra de Saturao HSV para maior robustez
 """
 
+from __future__ import annotations
+
 import os
 import cv2
 import numpy as np
 import joblib
 from pathlib import Path
+
+# =============================================================================
+# Seção 3 (ml-conventions): Thresholds de saturação — NÃO alterar sem documentar experimento
+# =============================================================================
+SAT_HIGH_THRESHOLD      = 120  # sat > 120 → SAT_HIGH
+SAT_MID_UPPER_THRESHOLD = 100  # sat > 100 → MID_HIGH_SAT
+SAT_LOW_THRESHOLD       =  50  # sat < 50  → LOW_SAT_FORCE_TAMPINHA
+SAT_VERY_LOW_THRESHOLD  =  30  # sat < 30  → SAT_VERY_LOW (não-tampinha)
+
+# =============================================================================
+# Seção 6 (ml-conventions): Caminhos de modelo — constantes, nunca inline
+# =============================================================================
+MODEL_PATH  = Path('models/svm/svm_model_complete.pkl')
+SCALER_PATH = Path('models/svm/scaler_complete.pkl')
 
 def extract_color_features(image_path):
     """Extrai 24 features da imagem"""
@@ -81,48 +97,39 @@ def hybrid_classify_v2(image_path, model, scaler, sat_threshold=120):
     
     Thresholds ajustados com base em imagem6 (tampinha)
     """
-    image = cv2.imread(str(image_path))
-    if image is None:
-        return None, None, None, "ERRO"
-    
-    # Extrair saturao HSV
-    img_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    saturation = np.mean(img_hsv[:, :, 1])
-    
-    # Extrair features SVM
+    # features[12] = HSV-S mean (saturação) no vetor de 24 features
+    # Sem imread/cvtColor duplicados — seção 5 da ml-conventions
     features = extract_color_features(image_path)
     if features is None or np.isnan(features).any():
-        return None, None, saturation, "ERRO"
-    
+        return None, None, None, "ERRO"
+
+    saturation = float(features[12])  # HSV-S mean: índices 12-14 são (mean, std, median) do canal S
     features_scaled = scaler.transform([features])
-    
-    # Predio SVM
+
+    # Predição SVM
     svm_pred = model.predict(features_scaled)[0]
     svm_conf = model.decision_function(features_scaled)[0]
     svm_prob = 1 / (1 + np.exp(-svm_conf))
-    
-    # Regra Hbrida AJUSTADA - EQUILÍBRIO PERFEITO
-    if saturation > 120:  # Tampinhas com saturação alta (127+)
+
+    if saturation > SAT_HIGH_THRESHOLD:
         confidence = 0.95 if svm_pred == 1 else 0.90
         return 1, confidence, saturation, "SAT_HIGH"
-    elif saturation < 30:  # Saturação muito baixa = NÃO-TAMPINHA
+    elif saturation < SAT_VERY_LOW_THRESHOLD:
         confidence = 0.95
         return 0, confidence, saturation, "SAT_VERY_LOW"
-    else:  # Zona intermediária (30-120): lógica específica
-        if saturation > 100:  # 100-120: chance de ser tampinha
+    else:
+        if saturation > SAT_MID_UPPER_THRESHOLD:
             if svm_pred == 1:
                 return 1, 0.75, saturation, "MID_HIGH_SAT"
             else:
                 return 0, 0.65, saturation, "NOT_TAMPINHA"
-        elif saturation < 50:  # 30-50: ZONA ESPECIAL - FORÇAR TAMPINHA
-            # Baseado no feedback: 7777777777.jpeg (37.1) É TAMPINHA
-            # Ignorar SVM nesta zona e classificar como tampinha
+        elif saturation < SAT_LOW_THRESHOLD:
             return 1, 0.75, saturation, "LOW_SAT_FORCE_TAMPINHA"
-        else:  # 50-100: zona crítica, SVM decide
+        else:
             if svm_pred == 1 and svm_prob > 0.8:
                 return 1, svm_prob, saturation, "SVM_HIGH_CONF"
             else:
-                return 0, max(0.7, 1-svm_prob), saturation, "NOT_TAMPINHA"
+                return 0, max(0.7, 1 - svm_prob), saturation, "NOT_TAMPINHA"
 
 def main():
     print("="*70)
@@ -132,8 +139,8 @@ def main():
 
     # Carregar modelo
     try:
-        model = joblib.load('models/svm/svm_model_complete.pkl')
-        scaler = joblib.load('models/svm/scaler_complete.pkl')
+        model = joblib.load(MODEL_PATH)
+        scaler = joblib.load(SCALER_PATH)
         print("Modelo SVM (Completo) carregado com sucesso!")
     except Exception as e:
         print(f" Erro ao carregar modelo: {e}")

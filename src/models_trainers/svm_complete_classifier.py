@@ -12,6 +12,8 @@ Treina com:
 Total: 2118+ imagens (2104+ tampinhas + 14 não-tampinhas)
 """
 
+from __future__ import annotations
+
 import os
 import cv2
 import numpy as np
