@@ -13,6 +13,7 @@ import pytest
 import base64
 import numpy as np
 import cv2
+import os
 from unittest.mock import MagicMock, patch
 
 from app import app
@@ -379,3 +380,160 @@ class TestValidateMechanicalEsp32:
         # Deve rejeitar antes de validar mecânica
         if 'status' in data:
             assert data['status'] in ('rejeitado', 'erro_classificacao')
+
+
+# =============================================================================
+# TestSpeechRoutes
+# =============================================================================
+
+class TestSpeechRoutes:
+    """Testes para rotas de áudio de sustentabilidade."""
+
+    def test_get_sustainability_speech_sem_arquivo(self, client):
+        """GET /api/speech/sustainability sem arquivo → 500."""
+        with patch('app.generate_sustainability_speech', return_value=None):
+            response = client.get('/api/speech/sustainability')
+        assert response.status_code == 500
+
+    def test_get_speech_info_retorna_disponibilidade(self, client):
+        """GET /api/speech/info retorna informações do áudio."""
+        response = client.get('/api/speech/info')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert 'available' in data
+        assert 'size' in data
+        assert 'url' in data
+
+    def test_get_speech_info_url_correto(self, client):
+        """URL do áudio deve apontar para /api/speech/sustainability."""
+        response = client.get('/api/speech/info')
+        data = response.get_json()
+        assert data['url'] == '/api/speech/sustainability'
+
+
+# =============================================================================
+# TestPageRoutes
+# =============================================================================
+
+class TestPageRoutes:
+    """Testes para rotas de páginas HTML."""
+
+    def test_index_retorna_200(self, client):
+        """GET / deve retornar 200."""
+        response = client.get('/')
+        assert response.status_code == 200
+
+    def test_totem_intro_retorna_html(self, client):
+        """GET /totem_intro.html retorna HTML."""
+        response = client.get('/totem_intro.html')
+        assert response.status_code == 200
+
+    def test_totem_v2_retorna_html(self, client):
+        """GET /totem_v2.html retorna HTML."""
+        response = client.get('/totem_v2.html')
+        assert response.status_code == 200
+
+    def test_processing_retorna_html(self, client):
+        """GET /processing retorna HTML."""
+        response = client.get('/processing')
+        assert response.status_code == 200
+
+    def test_finalization_retorna_html(self, client):
+        """GET /finalization retorna HTML."""
+        response = client.get('/finalization')
+        assert response.status_code == 200
+
+    def test_rewards_retorna_html(self, client):
+        """GET /rewards retorna HTML."""
+        response = client.get('/rewards')
+        assert response.status_code == 200
+
+    def test_test_page_retorna_html(self, client):
+        """GET /test retorna página de teste."""
+        response = client.get('/test')
+        assert response.status_code == 200
+
+    def test_esp32_simulator_retorna_html(self, client):
+        """GET /esp32_simulator.html retorna simulador."""
+        response = client.get('/esp32_simulator.html')
+        assert response.status_code == 200
+
+
+# =============================================================================
+# TestServeTestImage
+# =============================================================================
+
+class TestServeTestImage:
+    """Testes para rota de servir imagem de teste."""
+
+    def test_serve_test_image_retorna_jpeg(self, client):
+        """GET /test_tampinha.jpg retorna imagem."""
+        response = client.get('/test_tampinha.jpg')
+        assert response.status_code == 200
+        assert 'image' in response.content_type.lower()
+
+
+# =============================================================================
+# TestErrorHandling
+# =============================================================================
+
+class TestErrorHandling:
+    """Testes de tratamento de erro."""
+
+    def test_404_para_rota_inexistente(self, client):
+        """Rota inexistente deve retornar 404."""
+        response = client.get('/rota/que/nao/existe')
+        assert response.status_code == 404
+
+    def test_classify_com_arquivo_corrompido(self, client):
+        """Arquivo corrompido deve retornar erro."""
+        response = client.post('/api/classify', json={'image': 'data:image/jpeg;base64,!!invalid!!'})
+        assert response.status_code in (400, 500)
+
+
+# =============================================================================
+# TestAPIConsistency
+# =============================================================================
+
+class TestAPIConsistency:
+    """Testes de consistência da API."""
+
+    def test_health_check_sempre_sucesso(self, client):
+        """Health check nunca deve falhar."""
+        for _ in range(5):
+            response = client.get('/api/health')
+            assert response.status_code == 200
+
+    def test_resposta_json_bem_formada(self, client):
+        """Respostas JSON devem ser bem formadas."""
+        response = client.get('/api/health')
+        assert response.is_json
+        data = response.get_json()
+        assert isinstance(data, dict)
+
+
+# =============================================================================
+# TestConcurrency
+# =============================================================================
+
+class TestConcurrency:
+    """Testes para requisições simultâneas."""
+
+    def test_multiplas_health_checks(self, client):
+        """Múltiplos health checks devem funcionar."""
+        responses = [client.get('/api/health') for _ in range(10)]
+        assert all(r.status_code == 200 for r in responses)
+
+    def test_multiplas_classificacoes(self, client):
+        """Múltiplas classificações não devem interferir."""
+        image_b64 = create_test_image_b64(saturation=150)
+        
+        with patch('app.image_classifier') as mock_clf:
+            mock_clf.classify_image.return_value = (1, 0.95, 150.0, "SAT_HIGH")
+            
+            responses = [
+                client.post('/api/classify', json={'image': image_b64})
+                for _ in range(3)
+            ]
+        
+        assert all(r.status_code == 200 for r in responses)
