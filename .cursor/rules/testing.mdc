@@ -1,0 +1,89 @@
+---
+description: Regras para escrita de testes unitários e de integração
+globs: ["test_*.py", "tests/**/*.py"]
+alwaysApply: false
+---
+
+# 🧪 Testes — TOTEM IA
+
+## Framework e Estrutura
+
+- Usar **pytest** como framework de testes
+- Arquivos de teste: `test_<modulo>.py` na raiz ou `tests/` 
+- Classes de teste: `TestNomeDoModulo`
+- Funções de teste: `test_<comportamento_esperado>`
+
+## Organização dos Testes
+
+```
+test_classify.py          → Testes do ImageClassifier
+test_database.py          → Testes do DatabaseConnection
+test_esp32.py             → Testes de integração ESP32
+test_routes.py            → Testes das rotas Flask
+test_debug_mode.py        → Testes do modo debug
+```
+
+## Padrão AAA (Arrange-Act-Assert)
+
+```python
+def test_classify_image_returns_tampinha_for_high_saturation():
+    # Arrange
+    classifier = ImageClassifier()
+    classifier.model = mock_model
+    classifier.scaler = mock_scaler
+    image = create_test_image(saturation=150)
+
+    # Act
+    pred, conf, sat, method = classifier.classify_image(image)
+
+    # Assert
+    assert pred == 1
+    assert conf >= 0.90
+    assert method == "SAT_HIGH"
+```
+
+## Mocking
+
+- **Mockar** dependências externas: ESP32, OpenAI, banco de dados
+- Usar `unittest.mock.patch` ou `pytest-mock`
+- **Nunca** chamar APIs reais em testes unitários
+- Criar fixtures reutilizáveis para imagens, modelos e conexões
+
+```python
+@pytest.fixture
+def mock_classifier():
+    classifier = ImageClassifier()
+    classifier.model = MagicMock()
+    classifier.scaler = MagicMock()
+    return classifier
+
+@pytest.fixture
+def sample_image():
+    return np.zeros((128, 128, 3), dtype=np.uint8)
+```
+
+## Cobertura Mínima
+
+- Testar **todos** os caminhos de classificação (SAT_HIGH, SAT_VERY_LOW, MID_HIGH_SAT, etc.)
+- Testar cenários de erro (imagem None, modelo não carregado, ESP32 offline)
+- Testar validação de input nas rotas (JSON inválido, arquivo muito grande, extensão errada)
+
+## Testes de Integração
+
+- Prefixar com `test_integration_` ou colocar em pasta `tests/integration/`
+- Usar `app.test_client()` do Flask para testar rotas
+- Usar banco SQLite em memória (`:memory:`) para testes de DB
+
+```python
+@pytest.fixture
+def client():
+    app.config['TESTING'] = True
+    with app.test_client() as client:
+        yield client
+```
+
+## O que NÃO Testar
+
+- Não testar código de terceiros (Flask, OpenCV, sklearn)
+- Não testar getters/setters triviais
+- Não testar configurações estáticas (constantes, enums)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sqlite3
 import logging
 import time 
@@ -98,7 +100,7 @@ class DatabaseConnection:
         REJEITADO = 'rejeitado'
         ERRO_DESCONHECIDO = 'erro_desconhecido'
 
-    def save_interaction(self, resultado: ResultadoInteracao, deposit_id=None):
+    def save_interaction(self, resultado: ResultadoInteracao, deposit_id: int | None = None) -> None:
         try:
             if not self.conn:
                 self.__connect()
@@ -117,56 +119,51 @@ class DatabaseConnection:
             logger.error(f"❌ Erro ao registrar interação: {e}")
     
 
-    def get_total_interacoes(self):
+    def get_total_interacoes(self) -> int:
         try:
-            conn = sqlite3.connect('totem_data.db')
-            c = conn.cursor()
+            if not self.conn:
+                self.__connect()
+            if not self.conn:
+                raise Exception("Conexão com o banco de dados não estabelecida.")
+
+            c = self.conn.cursor()
             c.execute('''SELECT COUNT(*) FROM interactions''')
             resultado = c.fetchone()
             total = resultado[0] if resultado else 0
             logger.info(f"ℹ️ Total de interações no banco: {total}")
             return total
         except Exception as e:
-            logger.error(f"❌ Erro ao buscar total de interações: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Erro ao buscar total de interações: {e}", exc_info=True)
             return 0
-        finally:
-            conn.close()
-            print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
 
 
-    def get_all_deposits(self):
+    def get_all_deposits(self) -> list[dict]:
         try:
-            conn = sqlite3.connect('totem_data.db')
-            c = conn.cursor()
+            if not self.conn:
+                self.__connect()
+            if not self.conn:
+                raise Exception("Conexão com o banco de dados não estabelecida.")
+
+            c = self.conn.cursor()
             c.execute('''SELECT id, timestamp, ml_confidence, presence_detected, weight_value, weight_ok, plastico_reciclado_g FROM deposits ORDER BY timestamp DESC''')
             rows = c.fetchall()
-            deposits = []
-            for row in rows:
-                deposits.append({
+            deposits = [
+                {
                     'id': row[0],
                     'timestamp': row[1],
                     'ml_confidence': row[2],
                     'presence_detected': row[3],
                     'weight_value': row[4],
                     'weight_ok': row[5],
-                    'plastico_reciclado_g': row[5]
-                })
+                    'plastico_reciclado_g': row[6]
+                }
+                for row in rows
+            ]
             logger.info(f"ℹ️ Recuperados {len(deposits)} depósitos do banco")
             return deposits
         except Exception as e:
-            logger.error(f"❌ Erro ao buscar depósitos: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"❌ Erro ao buscar depósitos: {e}", exc_info=True)
             return []
-        finally:
-            conn.close()
-            print(f"✅ Conexão com o banco de dados 'totem_data.db' fechada.")
-
-
-
-
 
 
 

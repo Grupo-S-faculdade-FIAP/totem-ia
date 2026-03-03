@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-
-from re import DEBUG
-from tkinter import Image
-from flask import Flask, render_template, request, jsonify, send_file
-from flask_cors import CORS
-import openai
-import numpy as np
+from __future__ import annotations
 
 import logging
 import os
 import base64
 import time
-import requests
+import traceback
+import random
+
 import cv2
 import joblib
+import numpy as np
+import openai
+import requests
+from flask import Flask, render_template, request, jsonify, send_file
+from flask_cors import CORS
 
 from datetime import datetime
 from pathlib import Path
@@ -41,7 +42,6 @@ CORS(app)
 
 # 🐛 Configurar pasta de imagens como estática
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-import os
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
 app.config['IMAGES_FOLDER'] = images_folder
 
@@ -60,6 +60,14 @@ if MODO_DEBUG:
 else:
     logger.info("✅ Modo Debug desativado (Produção)")
 
+
+# ============================================================================
+# CONSTANTES
+# ============================================================================
+PESO_MIN_TAMPINHA = 2400  # gramas
+PESO_MAX_TAMPINHA = 2800  # gramas
+MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
 
 # Configuração ESP32 LOCAL (para fallback)
 ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
@@ -181,7 +189,7 @@ def api_classify():
             if file.filename == '':
                 return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
             
-            allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
+            allowed_extensions = ALLOWED_EXTENSIONS
             if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
                 return jsonify({'error': 'Tipo de arquivo nao permitido. Use: PNG, JPG, JPEG, GIF, BMP'}), 400
             
@@ -189,7 +197,7 @@ def api_classify():
             file_size = file.tell()
             file.seek(0)
             
-            if file_size > 10 * 1024 * 1024:
+            if file_size > MAX_FILE_SIZE_BYTES:
                 return jsonify({'error': 'Arquivo muito grande. Maximo 10MB'}), 400
             
             file_bytes = file.read()
@@ -236,10 +244,12 @@ def api_classify():
         return jsonify(response), 200
 
     except Exception as e:
-        import traceback
-        logger.error(f"Erro no endpoint /classify: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({'error': str(e), 'status': 'erro', 'traceback': traceback.format_exc()}, 500)
+        logger.error(f"Erro no endpoint /classify: {e}", exc_info=True)
+        return jsonify({
+            'error': 'Erro interno ao classificar imagem',
+            'status': 'erro',
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 
 # =============================================================================
@@ -262,7 +272,7 @@ def api_validate_mechanical():
         logger.info(f"🔍 Validação Mecânica: presença={presenca}, peso={peso}")
         
         # Validar condições mecânicas
-        is_valid = presenca and peso >= 2400 and peso <= 2800
+        is_valid = presenca and PESO_MIN_TAMPINHA <= peso <= PESO_MAX_TAMPINHA
         
         if is_valid:
             logger.info("✅ Validação Mecânica: APROVADO")
@@ -277,7 +287,7 @@ def api_validate_mechanical():
             reason = []
             if not presenca:
                 reason.append("Presença não detectada")
-            if peso < 2400 or peso > 2800:
+            if peso < PESO_MIN_TAMPINHA or peso > PESO_MAX_TAMPINHA:
                 reason.append(f"Peso fora do intervalo (recebido: {peso}g)")
             
             logger.warning(f"❌ Validação Mecânica: REJEITADO - {', '.join(reason)}")
@@ -290,10 +300,12 @@ def api_validate_mechanical():
             }), 200
     
     except Exception as e:
-        logger.error(f"Erro na validação mecânica: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({'error': str(e), 'status': 'erro'}, 500)
+        logger.error(f"Erro na validação mecânica: {e}", exc_info=True)
+        return jsonify({
+            'error': 'Erro interno na validação mecânica',
+            'status': 'erro',
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 
 # =============================================================================
@@ -326,8 +338,7 @@ def api_validate_complete():
             if file.filename == '':
                 return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
             
-            allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
-            if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+            if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS):
                 return jsonify({'error': 'Tipo de arquivo nao permitido'}), 400
             
             file_bytes = file.read()
@@ -468,12 +479,10 @@ def api_validate_complete():
         return jsonify(response), 200
 
     except Exception as e:
-        import traceback
-        logger.error(f"Erro em /validate-complete: {e}")
-        logger.error(traceback.format_exc())
+        logger.error(f"Erro em /validate-complete: {e}", exc_info=True)
         return jsonify({
             'status': 'erro',
-            'error': str(e),
+            'error': 'Erro interno na validação completa',
             'timestamp': datetime.now().isoformat()
         }), 500
 
@@ -666,39 +675,16 @@ def validate_mechanical():
             }), 400
 
     except Exception as outer_error:
-        logger.error(f"❌ Erro no endpoint /validate_mechanical: {outer_error}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"❌ Erro no endpoint /validate_mechanical: {outer_error}", exc_info=True)
         return jsonify({
-            'error': str(outer_error),
+            'error': 'Erro interno na validação mecânica',
             'validation': 'FAIL',
-            'traceback': traceback.format_exc()
+            'timestamp': datetime.now().isoformat()
         }), 500
 
 
-# =============================================================================
-# ROTA DEBUG - Imagem Dummy
-# =============================================================================
-@app.route('/debug-image/<path:filename>', methods=['GET'])
-def debug_image(filename):
-    """Retorna imagem de teste para modo debug"""
-    try:
-        # Usar test_tampinha.jpg como imagem dummy
-        image_path = Path('test_tampinha.jpg')
-        if not image_path.exists():
-            logger.warning("⚠️ test_tampinha.jpg não encontrado")
-            image_path = Path('datasets/color-cap/train/images') / filename
-        
-        if image_path.exists():
-            return send_file(str(image_path), mimetype='image/jpeg')
-        else:
-            return jsonify({'error': 'Imagem não encontrada'}), 404
-    except Exception as e:
-        logger.error(f"Erro ao servir imagem debug: {e}")
-        return jsonify({'error': str(e)}), 500
 
-
-def generate_sustainability_speech(use_cache=True):
+def generate_sustainability_speech(use_cache: bool = True) -> str | None:
     """
     Retorna arquivo de áudio sobre sustentabilidade (pré-gerado)
     """
@@ -851,8 +837,7 @@ def api_admin_dashboard():
     Retorna dados para o dashboard admin
     """
     try:
-        import random
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         
         if db_connection:
             with db_connection as db:
@@ -927,5 +912,4 @@ if __name__ == '__main__':
         print("\nServidor interrompido pelo usuario.")
     except Exception as e:
         print(f"ERRO: {e}")
-        import traceback
         traceback.print_exc()

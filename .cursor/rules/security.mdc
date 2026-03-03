@@ -1,0 +1,60 @@
+---
+description: Regras de segurança para proteção de dados e APIs
+globs: ["**/*.py", "**/*.html", "**/*.env*"]
+alwaysApply: true
+---
+
+# 🔐 Segurança — TOTEM IA
+
+## Credenciais e Segredos
+
+- **NUNCA** commitar `.env`, tokens, senhas ou chaves de API no repositório
+- Usar `python-dotenv` para carregar variáveis de ambiente
+- Manter `env.example` atualizado com placeholders (sem valores reais)
+- JWT secrets devem ter no mínimo 32 caracteres aleatórios
+
+## Validação de Input
+
+### Uploads de Arquivo
+- Validar extensão (apenas `png, jpg, jpeg, gif, bmp`)
+- Validar tamanho máximo (10MB)
+- **Nunca** confiar no `Content-Type` do request — verificar bytes
+- Sanitizar nomes de arquivo com `werkzeug.utils.secure_filename`
+
+### Dados JSON
+- Sempre verificar `request.is_json` antes de `get_json()`
+- Validar campos obrigatórios antes de processar
+- Tratar `KeyError` e `TypeError` em dados de input
+
+```python
+# ✅ Validação segura
+data = request.get_json()
+if not data or 'image' not in data:
+    return jsonify({'error': 'Campo obrigatório ausente'}), 400
+```
+
+## Autenticação
+
+- Usar variáveis de ambiente para credenciais admin (`ADMIN_USERNAME`, `ADMIN_PASSWORD`)
+- Em produção, implementar JWT com expiração (não usar token estático `'admin_token'`)
+- Rate limiting em endpoints de login para prevenir brute force
+- Logar tentativas de login falhadas (sem expor senha nos logs)
+
+## Rotas e Endpoints
+
+- Endpoints admin devem ter autenticação
+- Modo debug (`MODO_DEBUG`) **nunca** ativo em produção
+- Não expor tracebacks em respostas de erro em produção
+- Usar CORS configurado (não `CORS(app)` aberto para tudo em produção)
+
+## Banco de Dados
+
+- Usar queries parametrizadas (já feito com `?` placeholders) — **nunca** concatenar strings
+- Não expor dados sensíveis em logs
+- Validar dados antes de inserir
+
+## Logs
+
+- **Nunca** logar: senhas, tokens JWT completos, chaves de API
+- Truncar tokens em logs: `token[:30]...`
+- Logs de erro não devem expor stack traces ao usuário final

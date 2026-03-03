@@ -1,0 +1,62 @@
+---
+description: Convenções de Git, commits e versionamento
+globs: ["**/*"]
+alwaysApply: false
+---
+
+# 📦 Convenções Git — TOTEM IA
+
+## Commits
+
+Usar **Conventional Commits** em português:
+
+```
+<tipo>(<escopo>): <descrição curta>
+
+<corpo opcional>
+```
+
+### Tipos
+- `feat` → Nova funcionalidade
+- `fix` → Correção de bug
+- `refactor` → Refatoração sem alterar comportamento
+- `test` → Adição ou correção de testes
+- `docs` → Documentação
+- `style` → Formatação (sem mudança de lógica)
+- `perf` → Melhoria de performance
+- `chore` → Tarefas de manutenção (deps, configs)
+
+### Escopos
+- `api` → Rotas Flask
+- `ml` → Modelo de classificação
+- `db` → Banco de dados
+- `esp32` → Hardware/IoT
+- `ui` → Templates HTML
+- `auth` → Autenticação
+
+### Exemplos
+```
+feat(ml): adicionar validação de saturação no classificador
+fix(api): corrigir resposta duplicada em /validate-complete
+test(db): adicionar testes unitários para DatabaseConnection
+perf(ml): cachear modelo SVM na inicialização
+```
+
+## Branches
+
+- `main` → Produção estável
+- `develop` → Desenvolvimento integrado
+- `feature/<nome>` → Nova funcionalidade
+- `fix/<nome>` → Correção
+- `test/<nome>` → Testes
+
+## .gitignore
+
+Nunca commitar:
+- `.env` (credenciais)
+- `__pycache__/`, `*.pyc`
+- `totem_data.db` (banco local)
+- `models/svm/*.pkl` (modelos treinados grandes)
+- `images/` (dados de teste)
+- `.cursor/` (configuração local do editor)
+- `node_modules/`, `venv/`, `.venv/`

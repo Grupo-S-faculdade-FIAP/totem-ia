@@ -1,0 +1,65 @@
+---
+description: Princípios de Clean Architecture e separação de responsabilidades
+globs: ["src/**/*.py", "app.py", "prompts/**/*.py"]
+alwaysApply: true
+---
+
+# 🏗️ Clean Architecture — TOTEM IA
+
+## Estrutura de Camadas
+
+O projeto segue separação em camadas. Respeite os limites:
+
+```
+app.py                    → Camada de Apresentação (rotas HTTP, entrada/saída)
+src/modules/              → Camada de Aplicação (lógica de negócio, classificação)
+src/database/             → Camada de Infraestrutura (persistência)
+src/hardware/             → Camada de Infraestrutura (comunicação ESP32)
+src/models_classifiers/   → Camada de Domínio (algoritmos ML)
+src/models_trainers/      → Scripts de treinamento (offline)
+prompts/                  → Configuração de agentes IA
+```
+
+## Regras de Dependência
+
+- `app.py` pode importar de `src/` e `prompts/`, **nunca** o contrário
+- `src/modules/` NÃO deve importar de `src/database/` nem `src/hardware/` diretamente
+- `src/database/` e `src/hardware/` são independentes entre si
+- `src/models_classifiers/` é puro: só depende de numpy, cv2, sklearn
+
+## Princípios
+
+### Single Responsibility (SRP)
+- Cada classe/módulo tem UMA responsabilidade clara
+- `ImageClassifier` → classificar imagens
+- `DatabaseConnection` → persistir dados
+- `esp32.py` → comunicar com hardware
+- Rotas em `app.py` → orquestrar chamadas
+
+### Dependency Inversion
+- Classes de infraestrutura devem ser injetadas, não instanciadas dentro do negócio
+- Usar interfaces/protocolos quando possível para desacoplamento
+
+```python
+# ✅ Bom: injeção no app.py
+image_classifier = ImageClassifier()
+db_connection = DatabaseConnection()
+
+# ❌ Ruim: instanciar DB dentro do classificador
+class ImageClassifier:
+    def __init__(self):
+        self.db = DatabaseConnection()  # acoplamento
+```
+
+### Open/Closed
+- Novas funcionalidades via **extensão** (novos módulos), não modificação de existentes
+- Para novo tipo de classificador → criar novo arquivo em `src/models_classifiers/`
+- Para novo hardware → criar novo arquivo em `src/hardware/`
+
+## Novas Rotas
+
+Ao criar novas rotas em `app.py`:
+1. Agrupar por domínio com comentários de seção `# ====`
+2. Validar input no início da rota
+3. Delegar lógica para módulos em `src/`
+4. Retornar resposta padronizada com `timestamp`
