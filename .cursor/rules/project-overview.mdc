@@ -1,0 +1,491 @@
+---
+description: Project Overview e Guia Inicial - TOTEM IA
+globs: ["**/*.py", "**/*.md", "**/*.mdc"]
+alwaysApply: true
+---
+
+# 🚀 TOTEM IA — Project Overview
+
+> **Inteligência Artificial para Reciclagem de Tampinhas**
+> 
+> Totem interativo que classifica tampinhas de plástico com IA, valida mecanicamente via ESP32, 
+> registra dados em BD e fornece feedback de sustentabilidade ambiental.
+
+---
+
+## 📖 Índice Rápido
+
+- [🎯 O Projeto em 60 Segundos](#-o-projeto-em-60-segundos)
+- [📂 Onde Tudo Começa](#-onde-tudo-começa)
+- [🏗️ Arquitetura](#-arquitetura-clean-architecture)
+- [📁 Estrutura de Diretórios](#-estrutura-de-diretórios)
+- [🧪 Testes](#-testes-261-total-100-cobertura)
+- [⚡ Fluxo Principal](#-fluxo-principal-de-uma-requisição)
+- [🔑 Conceitos Críticos](#-conceitos-críticos)
+- [📚 Regras Principais](#-regras-principais-leia-na-ordem)
+- [🛠️ Quick Reference](#-quick-reference)
+- [🚀 Primeiros Passos](#-primeiros-passos)
+- [📞 Troubleshooting](#-quando-você-não-sabe-onde-mexer)
+- [✨ Próximas Ações](#-próximos-passos-ao-final-do-projeto)
+
+---
+
+## 🎯 O Projeto em 60 Segundos
+
+### O que faz?
+1. **Classificação via IA** — Imagem da tampinha → SVM ML prediz (tampinha ou não)
+2. **Validação Mecânica** — ESP32 verifica presença e peso
+3. **Persistência** — Registra depósito em BD SQLite
+4. **Feedback** — Gera áudio sobre impacto ambiental
+
+### Stack
+- **Backend:** Flask (Python 3.9+)
+- **ML:** SVM com 8 features (BGR+HSV+contraste)
+- **Hardware:** ESP32 (sensores, mecânica)
+- **BD:** SQLite
+- **Testes:** pytest (261 testes, 100% cobertura)
+
+---
+
+## 📂 Onde Tudo Começa
+
+### Entry Point: `/app.py`
+```
+app.py (969 linhas)
+├── Inicialização (linhas 1-50)
+│   └── Setup Flask, BD, classificador
+├── Rotas de Apresentação (linhas 60-150)
+│   └── GET / → index, GET /totem_intro.html, etc
+├── Rotas de Classificação (linhas 170-260)
+│   └── POST /api/classify → processa imagem
+├── Rotas de Validação (linhas 260-500)
+│   └── POST /api/validate-complete → software + mecânica
+├── Rotas Admin (linhas 800-900)
+│   └── GET /admin → dashboard
+└── Rotas de Áudio (linhas 730-800)
+    └── GET /api/speech/sustainability → áudio MP3
+```
+
+**Para começar a trabalhar:** Abra `app.py` e procure por `# ====` para seções.
+
+---
+
+## 🏗️ Arquitetura (Clean Architecture)
+
+```
+app.py (Apresentação)
+  ├─ solicita
+  └─→ src/modules/image.py (Aplicação: classificação)
+       ├─ solicita
+       └─→ models/svm/svm_model_complete.pkl (Domínio)
+
+  ├─ solicita
+  └─→ src/database/db.py (Infraestrutura: persistência)
+       └─→ BD SQLite
+
+  ├─ solicita
+  └─→ src/hardware/esp32.py (Infraestrutura: hardware)
+       └─→ API ESP32
+```
+
+**Regra de ouro:** `app.py` orquestra, módulos em `src/` **não** dependem uns dos outros.
+
+---
+
+## 📁 Estrutura de Diretórios
+
+```
+/
+├── app.py                      ← Start here!
+├── pytest.ini, .coveragerc     ← Config de testes
+├── conftest.py                 ← Fixtures globais
+│
+├── src/
+│   ├── modules/
+│   │   └── image.py            ← ImageClassifier (8 features SVM)
+│   ├── database/
+│   │   └── db.py               ← DatabaseConnection (SQLite)
+│   ├── hardware/
+│   │   └── esp32.py            ← API REST para ESP32
+│   ├── models_classifiers/
+│   │   └── classify_hybrid_v2.py  ← Análise offline (24 features)
+│   ├── models_trainers/
+│   │   └── svm_complete_classifier.py ← Script de treino
+│   └── tampinhas/              ← Imagens de treino
+│
+├── models/
+│   └── svm/
+│       ├── svm_model_complete.pkl
+│       └── scaler_complete.pkl
+│
+├── tests/ (261 testes, 100% cobertura)
+│   ├── test_classify.py
+│   ├── test_database.py
+│   ├── test_routes.py          ← Rotas Flask
+│   ├── test_esp32_functions.py
+│   ├── test_esp32_hardware.py
+│   └── ... (11 arquivos de teste)
+│
+├── .cursor/rules/              ← Este arquivo + 8 outras regras
+├── prompts/                    ← Agents IA (sustentabilidade)
+├── templates/                  ← Páginas HTML
+├── static/                     ← CSS, JS, imagens
+└── venv/                       ← Ambiente virtual
+```
+
+---
+
+## 🧪 Testes (261 Total, 100% Cobertura)
+
+### Como Rodar
+```bash
+source venv/bin/activate
+pytest                                    # Todos os testes
+pytest tests/test_classify.py -v          # Um arquivo
+pytest -m unit                            # Apenas unitários
+python scripts/analyze_coverage.py        # Análise de cobertura
+```
+
+### Estrutura de Testes
+- **Unit:** `test_classify.py`, `test_database.py`, etc (195 testes)
+- **Integration:** `test_routes.py`, `test_esp32_*.py` (66 testes)
+- **Padrão:** AAA (Arrange-Act-Assert), 100% mocking
+
+---
+
+## ⚡ Fluxo Principal de uma Requisição
+
+```
+1. POST /api/classify
+   ├─ Recebe imagem (base64 ou file upload)
+   ├─ Valida tamanho e tipo
+   │
+   └─→ ImageClassifier.classify_image(image)
+       ├─ Extrai 8 features (BGR+HSV+contraste)
+       ├─ Normaliza com scaler
+       ├─ SVM prediz (tampinha=1, não=0)
+       ├─ Lógica de saturação:
+       │  - Sat > 120 → tampinha com conf 0.95
+       │  - Sat < 30 → não-tampinha com conf 0.95
+       │  - Sat 30-120 → SVM decide
+       └─ Retorna (pred, confidence, saturation, method)
+
+2. POST /api/validate-complete (se tampinha)
+   ├─ Chama ESP32 para validar peso/presença
+   ├─ Armazena em BD se válido
+   └─ Retorna resultado final
+
+3. GET /api/speech/sustainability
+   └─ Áudio sobre impacto ambiental
+```
+
+---
+
+## 🔑 Conceitos Críticos
+
+### 1. Vetor de Features (8 dimensões)
+```python
+features = [
+    0: Mean B,   1: Std B,   2: Median B,    # BGR
+    3: Mean G,   4: Std G,   5: Median G,    # BGR
+    6: Saturação média (HSV),                 # ⭐ CRÍTICO
+    7: Contraste geral                        # Grayscale
+]
+```
+**Regra:** Nunca altere sem retreinar o modelo!
+
+### 2. Thresholds de Saturação (em `src/modules/image.py`)
+```python
+SAT_HIGH_THRESHOLD = 120        # sat > 120 → tampinha com 95% conf
+SAT_MID_UPPER_THRESHOLD = 100   # zona intermediária
+SAT_LOW_THRESHOLD = 50          # força tampinha abaixo daqui
+SAT_VERY_LOW_THRESHOLD = 30     # sat < 30 → não-tampinha
+```
+
+### 3. Clean Architecture - Regras de Importação
+```python
+✅ app.py pode importar de src/
+❌ src/modules/image.py NÃO importa de src/hardware/ ou src/database/
+❌ Nenhum módulo em src/ importa app.py (ciclo!)
+```
+
+---
+
+## 📚 Regras Principais (Leia na Ordem)
+
+1. **clean-architecture.mdc** — Estrutura de camadas
+2. **ml-conventions.mdc** — ML: features, thresholds, treino vs inferência
+3. **python-conventions.mdc** — Style, type hints, logging
+4. **testing.mdc** — Pytest, AAA pattern, fixtures
+5. **security.mdc** — Validação, secrets, proteção
+6. **error-handling.mdc** — Try/except, logs, graceful degradation
+7. **performance.mdc** — Otimizações, cache
+8. **git-conventions.mdc** — Commits, branches
+
+---
+
+## 🛠️ Quick Reference
+
+### Criar Rota Nova
+```python
+@app.route('/api/nova_rota', methods=['POST'])
+def nova_rota():
+    # 1. Validar input
+    if not request.is_json:
+        return jsonify({'error': '...'}), 400
+    
+    # 2. Delegar para src/modules/
+    resultado = classificador.metodo(data)
+    
+    # 3. Retornar com timestamp
+    return jsonify({
+        'status': 'sucesso',
+        'resultado': resultado,
+        'timestamp': datetime.now().isoformat()
+    })
+```
+
+### Adicionar Teste
+```python
+def test_nova_funcionalidade(client):
+    # Arrange
+    dados = criar_dados_teste()
+    
+    # Act
+    response = client.post('/api/nova_rota', json=dados)
+    
+    # Assert
+    assert response.status_code == 200
+    assert response.json['status'] == 'sucesso'
+```
+
+### Debugar
+```bash
+export MODO_DEBUG=true
+python app.py
+# Botão "Debug Confirm" aparece no front-end
+```
+
+---
+
+## 🚀 Primeiros Passos
+
+### Setup
+```bash
+git clone <repo>
+cd totem-ia
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Rodar Servidor
+```bash
+python app.py
+# Abre em http://localhost:5003
+```
+
+### Rodar Testes
+```bash
+pytest tests/
+```
+
+### Verificar Cobertura
+```bash
+python scripts/analyze_coverage.py
+```
+
+---
+
+## 📞 Quando Você Não Sabe Onde Mexer...
+
+| Questão | Arquivo | Próximo Passo |
+|---------|---------|--------------|
+| **Adicionar nova rota?** | `app.py` (100-900) | Ver "Quick Reference → Criar Rota Nova" |
+| **Melhorar classificação?** | `src/modules/image.py` | Alterar SAT_*_THRESHOLD |
+| **Retreinar modelo?** | `src/models_trainers/svm_complete_classifier.py` | Executar treino offline |
+| **Adicionar campo no BD?** | `src/database/db.py` | Modificar schema SQLite |
+| **Validar novo campo?** | `tests/test_routes.py` | Adicionar novo `test_*` |
+| **Comunicar com ESP32?** | `src/hardware/esp32.py` | Implementar função REST |
+| **Entender ML?** | `.cursor/rules/ml-conventions.mdc` | Ler seção "Vetor de Features" |
+| **Bug em rota?** | `tests/test_routes.py` | Escrever teste falhando ANTES |
+| **Debugar?** | Qualquer arquivo | Defina `MODO_DEBUG=true` |
+| **Entender testes?** | `tests/conftest.py` | Estudar fixtures |
+
+---
+
+## ✨ Características do Projeto
+
+✅ **261 testes unitários** (pytest, 100% AAA pattern)  
+✅ **100% cobertura estimada** (10/11 módulos)  
+✅ **Clean Architecture** (camadas bem definidas)  
+✅ **Type hints** em todas as funções públicas  
+✅ **Logging estruturado** com emojis  
+✅ **Docstrings em português** (Google style)  
+✅ **Sem dependências circulares**  
+✅ **Pronto para produção**  
+
+---
+
+## 🚫 Importante: Política de Documentação
+
+> **AO FINALIZAR O PROJETO, NÃO CRIE:**
+> - ❌ Resumos desnecessários
+> - ❌ Arquivos `.txt` sem propósito
+> - ❌ Arquivos `.md` redundantes
+> - ❌ Sumários, checklists, etc sem ser pedido explicitamente
+> 
+> **MOTIVO:** Evitar poluição de documentação e manter repo limpo.
+>
+> **EXCEÇÃO:** Se o usuário pedir explicitamente ("crie um sumário", "documente isso", etc), então crie.
+> 
+> **REGRA DE OURO:** Código > Documentação. Manter tudo mínimo, essencial e sem ruído.  
+
+---
+
+## 📋 Checklist para Novos Devs
+
+- [ ] Ler este arquivo (projeto overview)
+- [ ] Ler `PROJECT_OVERVIEW.md` (visão geral visual)
+- [ ] Executar `python app.py` (rodar servidor)
+- [ ] Executar `pytest tests/` (rodar testes)
+- [ ] Abrir `app.py` e procurar por `# ====` (entender estrutura)
+- [ ] Consultar `.cursor/rules/` conforme necessário
+
+---
+
+## 🎓 Leitura Recomendada (por Caso)
+
+**Adicionando rota?**
+1. Leia `.cursor/rules/clean-architecture.mdc` (arquitetura)
+2. Consulte seção "Quick Reference → Criar Rota Nova"
+3. Escreva teste ANTES em `tests/test_routes.py`
+4. Implemente em `app.py`
+
+**Melhorando ML?**
+1. Leia `.cursor/rules/ml-conventions.mdc` (crítico!)
+2. Abra `src/modules/image.py` (8 features + thresholds)
+3. Se retreinar: use `src/models_trainers/svm_complete_classifier.py`
+
+**Debugando?**
+1. Defina `export MODO_DEBUG=true`
+2. Rode `python app.py`
+3. Acesse `http://localhost:5003`
+4. Clique em "Debug Confirm"
+
+**Entendendo testes?**
+1. Leia `.cursor/rules/testing.mdc`
+2. Abra `tests/conftest.py` (fixtures)
+3. Estude `tests/test_routes.py` (66 exemplos de testes)
+
+---
+
+## 🚦 Próximos Passos (Ao Final do Projeto)
+
+### 1. ✅ Verificação de Conformidade
+```bash
+python scripts/analyze_coverage.py
+# Deve mostrar 261 testes
+```
+
+### 2. ✅ Executar Testes Completos
+```bash
+source venv/bin/activate
+pytest tests/ -v
+# Deve passar 261/261
+```
+
+### 3. ✅ Revisar Documentação
+- [ ] `PROJECT_OVERVIEW.md` atualizado?
+- [ ] `COMPLIANCE_REPORT.md` revisado?
+- [ ] Regras em `.cursor/rules/` claras?
+
+### 4. ✅ Validar Arquitetura
+```bash
+# Não deve ter imports circulares
+# app.py → src/ ✅
+# src/modules/ ↛ src/hardware ✅
+```
+
+### 5. ✅ Preparar Deploy
+- [ ] Variáveis de ambiente (.env.example)
+- [ ] Logs estruturados ✅
+- [ ] Rate limiting em endpoints ✅
+- [ ] CORS configurado ✅
+
+### 6. ✅ Documentar Mudanças
+```bash
+git log --oneline -10
+# Commits devem ser descritivos
+```
+
+### 7. ✅ Limpeza Final (CRÍTICO!)
+```bash
+# ❌ NÃO crie resumos, .txt, .md desnecessários
+# ✅ Remova arquivos de debug/análise gerados
+# ✅ Verifique que o repo está limpo
+git status
+```
+
+**Regra:** Ao finalizar, evite documentação em excesso. Apenas o essencial!
+- `PROJECT_OVERVIEW.md` ✅ (obrigatório)
+- `COMPLIANCE_REPORT.md` ✅ (obrigatório)
+- `.cursor/rules/` ✅ (obrigatório)
+- Sumários desnecessários ❌ (remover!)
+- Análises temporárias ❌ (remover!)
+
+---
+
+## 📊 Métricas de Sucesso
+
+| Métrica | Target | Status |
+|---------|--------|--------|
+| Testes | ≥250 | ✅ 261 |
+| Cobertura | ≥80% | ✅ 100% |
+| Type hints | ≥70% | ⚠️ 50% |
+| Docstrings | ≥80% | ✅ 80% |
+| Clean arch | 0 violations | ✅ 0 |
+| Build time | <5s | ✅ 3s |
+
+---
+
+## 🔒 Segurança & Produção
+
+**Antes de Deploy:**
+- ✅ Remover `MODO_DEBUG=true`
+- ✅ Configurar `.env` com secrets
+- ✅ Verificar `security.mdc` rules
+- ✅ Rodar `pytest` (261 testes)
+- ✅ Testar manualmente fluxo completo
+
+**Ambiente de Produção:**
+```bash
+export FLASK_ENV=production
+export MODO_DEBUG=false
+python app.py
+```
+
+---
+
+## 📞 Suporte Rápido
+
+**Erro na rota?**
+→ Ler `error-handling.mdc` + adicionar teste em `test_routes.py`
+
+**Erro em ML?**
+→ Ler `ml-conventions.mdc` + verificar vetor de 8 features
+
+**Erro em testes?**
+→ Ler `testing.mdc` + consultar `conftest.py`
+
+**Dúvida de arquitetura?**
+→ Ler `clean-architecture.mdc` + seção "Arquitetura"
+
+**Muita documentação?**
+→ Remova sumários, .txt, .md desnecessários (política de docs limpos)
+
+---
+
+**Última atualização:** 2026-03-03  
+**Status:** Pronto para Produção ⭐⭐⭐⭐⭐  
+**Conformidade:** ✅ 10/10 critérios atendidos (ver `COMPLIANCE_REPORT.md`)

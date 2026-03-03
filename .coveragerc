@@ -1,0 +1,24 @@
+[run]
+# Configuração de cobertura de código
+source = src, app.py
+omit =
+    */site-packages/*
+    */venv/*
+    */__pycache__/*
+    */tests/*
+
+[report]
+# Relatório de cobertura
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod
+    def __str__
+
+[html]
+directory = htmlcov
