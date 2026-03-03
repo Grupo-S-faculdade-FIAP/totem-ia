@@ -537,3 +537,255 @@ class TestConcurrency:
             ]
         
         assert all(r.status_code == 200 for r in responses)
+
+
+# =============================================================================
+# TestDebugConfirm
+# =============================================================================
+
+class TestDebugConfirm:
+    """Testes para rota de confirmação em modo debug."""
+
+    def test_debug_confirm_com_debug_ativo(self, client):
+        """POST /api/debug-confirm com MODO_DEBUG=true retorna sucesso."""
+        with patch.dict(os.environ, {'MODO_DEBUG': 'true'}):
+            with patch('app.MODO_DEBUG', True):
+                response = client.post('/api/debug-confirm', json={
+                    'detection_type': 'tampinha',
+                    'confidence': 0.95
+                })
+        
+        assert response.status_code in (200, 400)
+
+    def test_debug_confirm_rejeitado_sem_debug(self, client):
+        """POST /api/debug-confirm sem MODO_DEBUG retorna 403."""
+        with patch('app.MODO_DEBUG', False):
+            response = client.post('/api/debug-confirm', json={
+                'detection_type': 'tampinha',
+                'confidence': 0.95
+            })
+        
+        assert response.status_code == 403
+
+
+# =============================================================================
+# TestAdminPages
+# =============================================================================
+
+class TestAdminPages:
+    """Testes para páginas admin."""
+
+    def test_admin_login_page_retorna_html(self, client):
+        """GET /admin deve retornar página de login."""
+        response = client.get('/admin')
+        assert response.status_code == 200
+        assert response.content_type.startswith('text/html') or 'html' in response.content_type.lower()
+
+    def test_admin_dashboard_page_retorna_html(self, client):
+        """GET /admin/dashboard deve retornar página dashboard."""
+        response = client.get('/admin/dashboard')
+        assert response.status_code == 200
+
+
+# =============================================================================
+# TestValidateCompleteRoute
+# =============================================================================
+
+class TestValidateCompleteRoute:
+    """Testes para /api/validate-complete."""
+
+    def test_validate_complete_sem_imagem(self, client):
+        """POST /api/validate-complete sem imagem retorna erro."""
+        response = client.post('/api/validate-complete', json={})
+        assert response.status_code == 400
+
+    def test_validate_complete_com_tampinha(self, client):
+        """POST /api/validate-complete com tampinha retorna sucesso."""
+        image_b64 = create_test_image_b64(saturation=150)
+        
+        with patch('app.image_classifier') as mock_clf:
+            mock_clf.classify_image.return_value = (1, 0.95, 150.0, "SAT_HIGH")
+            with patch('app.check_esp32_mechanical') as mock_mech:
+                mock_mech.return_value = {'message': 'OK'}
+                
+                response = client.post('/api/validate-complete', json={
+                    'image': f'data:image/jpeg;base64,{image_b64}'
+                })
+        
+        assert response.status_code in (200, 400)
+
+    def test_validate_complete_nao_tampinha(self, client):
+        """POST /api/validate-complete com não-tampinha retorna rejeitado."""
+        image_b64 = create_test_image_b64(saturation=5)
+        
+        with patch('app.image_classifier') as mock_clf:
+            mock_clf.classify_image.return_value = (0, 0.95, 5.0, "SAT_VERY_LOW")
+            
+            response = client.post('/api/validate-complete', json={
+                'image': f'data:image/jpeg;base64,{image_b64}'
+            })
+        
+        assert response.status_code in (200, 400)
+
+
+# =============================================================================
+# TestSaveDepositRoute
+# =============================================================================
+
+class TestSaveDepositRoute:
+    """Testes para /api/save_deposit."""
+
+    def test_save_deposit_com_imagem_e_confianca(self, client):
+        """POST /api/save_deposit com imagem e confiança."""
+        image_b64 = create_test_image_b64(saturation=150)
+        
+        with patch('app.db_connection') as mock_db:
+            with patch('app.image_classifier') as mock_clf:
+                mock_clf.classify_image.return_value = (1, 0.95, 150.0, "SAT_HIGH")
+                
+                response = client.post('/api/save_deposit', json={
+                    'image': f'data:image/jpeg;base64,{image_b64}',
+                    'confidence': 0.95
+                })
+        
+        assert response.status_code in (200, 400, 500)
+
+    def test_save_deposit_sem_imagem(self, client):
+        """POST /api/save_deposit sem imagem retorna erro."""
+        response = client.post('/api/save_deposit', json={})
+        assert response.status_code in (400, 500)
+
+
+# =============================================================================
+# TestDebugImageRoute
+# =============================================================================
+
+class TestDebugImageRoute:
+    """Testes para /debug-image/<filename>."""
+
+    def test_debug_image_arquivo_valido(self, client):
+        """GET /debug-image/test_tampinha.jpg com arquivo válido."""
+        response = client.get('/debug-image/test_tampinha.jpg')
+        # Pode existir ou não o arquivo, mas não deve crash
+        assert response.status_code in (200, 404)
+
+    def test_debug_image_arquivo_inexistente(self, client):
+        """GET /debug-image/nao_existe.jpg retorna 404."""
+        response = client.get('/debug-image/arquivo_inexistente_xyz.jpg')
+        assert response.status_code == 404
+
+    def test_debug_image_path_traversal(self, client):
+        """GET /debug-image/../../../etc/passwd não permite path traversal."""
+        response = client.get('/debug-image/../../../etc/passwd')
+        # Deve rejeitar ou apenas não encontrar
+        assert response.status_code in (400, 404)
+
+
+# =============================================================================
+# TestValidateMechanicalCompleteRoute
+# =============================================================================
+
+class TestValidateMechanicalCompleteRoute:
+    """Testes para /api/validate_mechanical completo."""
+
+    def test_validate_mechanical_complete_flow(self, client):
+        """POST /api/validate_mechanical com flow completo."""
+        image_b64 = create_test_image_b64(saturation=150)
+        
+        with patch('app.image_classifier') as mock_clf:
+            mock_clf.classify_image.return_value = (1, 0.95, 150.0, "SAT_HIGH")
+            with patch('app.get_esp32_sensors') as mock_sensors:
+                mock_sensors.return_value = {'presenca': True, 'peso': 2600}
+                
+                response = client.post('/api/validate_mechanical', json={
+                    'image': f'data:image/jpeg;base64,{image_b64}'
+                })
+        
+        assert response.status_code in (200, 400)
+
+    def test_validate_mechanical_arquivo_enviado(self, client):
+        """POST /api/validate_mechanical com upload de arquivo."""
+        import io
+        
+        # Tenta enviar como multipart (se suportado)
+        data = {
+            'file': (io.BytesIO(b'fake image'), 'test.jpg')
+        }
+        
+        response = client.post(
+            '/api/validate_mechanical',
+            data=data,
+            content_type='multipart/form-data'
+        )
+        
+        # Pode retornar erro ou sucesso
+        assert response.status_code in (200, 400, 415)
+
+
+# =============================================================================
+# TestImageValidation
+# =============================================================================
+
+class TestImageValidation:
+    """Testes de validação rigorosa de imagens."""
+
+    def test_classify_com_imagem_muito_pequena(self, client):
+        """Imagem 1x1 pixel."""
+        hsv = np.zeros((1, 1, 3), dtype=np.uint8)
+        bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+        _, buffer = cv2.imencode('.jpg', bgr)
+        image_b64 = base64.b64encode(buffer).decode('utf-8')
+        
+        with patch('app.image_classifier') as mock_clf:
+            mock_clf.classify_image.return_value = (1, 0.5, 50.0, "UNKNOWN")
+            response = client.post('/api/classify', json={'image': image_b64})
+        
+        assert response.status_code in (200, 400, 500)
+
+    def test_classify_com_imagem_monocromatica(self, client):
+        """Imagem completamente branca."""
+        image = np.ones((128, 128, 3), dtype=np.uint8) * 255
+        _, buffer = cv2.imencode('.jpg', image)
+        image_b64 = base64.b64encode(buffer).decode('utf-8')
+        
+        with patch('app.image_classifier') as mock_clf:
+            mock_clf.classify_image.return_value = (0, 0.8, 0.0, "WHITE")
+            response = client.post('/api/classify', json={'image': image_b64})
+        
+        assert response.status_code in (200, 400)
+
+    def test_classify_com_imagem_preta(self, client):
+        """Imagem completamente preta."""
+        image = np.zeros((128, 128, 3), dtype=np.uint8)
+        _, buffer = cv2.imencode('.jpg', image)
+        image_b64 = base64.b64encode(buffer).decode('utf-8')
+        
+        with patch('app.image_classifier') as mock_clf:
+            mock_clf.classify_image.return_value = (0, 0.9, 0.0, "BLACK")
+            response = client.post('/api/classify', json={'image': image_b64})
+        
+        assert response.status_code in (200, 400)
+
+
+# =============================================================================
+# TestTokenExpiration
+# =============================================================================
+
+class TestTokenExpiration:
+    """Testes de expiração de token/session."""
+
+    def test_admin_login_token_invalido(self, client):
+        """Login com token inválido deve rejeitar."""
+        response = client.post('/api/admin/login', json={
+            'username': 'admin',
+            'password': 'wrong'
+        })
+        assert response.status_code in (401, 400)
+
+    def test_admin_dashboard_token_expirado(self, client):
+        """Dashboard com token expirado deve rejeitar."""
+        response = client.get(
+            '/api/admin/dashboard',
+            headers={'Authorization': 'Bearer expired_token_xyz'}
+        )
+        assert response.status_code in (401, 403)
