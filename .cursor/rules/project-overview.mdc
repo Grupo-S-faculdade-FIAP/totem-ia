@@ -327,6 +327,22 @@ python scripts/analyze_coverage.py
 
 ---
 
+## 🚫 Importante: Política de Documentação
+
+> **AO FINALIZAR O PROJETO, NÃO CRIE:**
+> - ❌ Resumos desnecessários
+> - ❌ Arquivos `.txt` sem propósito
+> - ❌ Arquivos `.md` redundantes
+> - ❌ Sumários, checklists, etc sem ser pedido explicitamente
+> 
+> **MOTIVO:** Evitar poluição de documentação e manter repo limpo.
+>
+> **EXCEÇÃO:** Se o usuário pedir explicitamente ("crie um sumário", "documente isso", etc), então crie.
+> 
+> **REGRA DE OURO:** Código > Documentação. Manter tudo mínimo, essencial e sem ruído.  
+
+---
+
 ## 📋 Checklist para Novos Devs
 
 - [ ] Ler este arquivo (projeto overview)
@@ -403,6 +419,21 @@ git log --oneline -10
 # Commits devem ser descritivos
 ```
 
+### 7. ✅ Limpeza Final (CRÍTICO!)
+```bash
+# ❌ NÃO crie resumos, .txt, .md desnecessários
+# ✅ Remova arquivos de debug/análise gerados
+# ✅ Verifique que o repo está limpo
+git status
+```
+
+**Regra:** Ao finalizar, evite documentação em excesso. Apenas o essencial!
+- `PROJECT_OVERVIEW.md` ✅ (obrigatório)
+- `COMPLIANCE_REPORT.md` ✅ (obrigatório)
+- `.cursor/rules/` ✅ (obrigatório)
+- Sumários desnecessários ❌ (remover!)
+- Análises temporárias ❌ (remover!)
+
 ---
 
 ## 📊 Métricas de Sucesso
@@ -449,6 +480,9 @@ python app.py
 
 **Dúvida de arquitetura?**
 → Ler `clean-architecture.mdc` + seção "Arquitetura"
+
+**Muita documentação?**
+→ Remova sumários, .txt, .md desnecessários (política de docs limpos)
 
 ---
 
