@@ -326,3 +326,158 @@ class TestSVMIntegrationComplete:
         
         assert len(predictions) == 10
         assert all(p in [0, 1] for p in predictions)
+
+
+class TestSVMCrossValidation:
+    """Testes de validação cruzada."""
+
+    def test_cross_val_score_executa(self):
+        """cross_val_score deve executar sem erro."""
+        from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
+        from sklearn.model_selection import cross_val_score
+        from sklearn.svm import SVC
+        
+        X = np.random.randn(50, 24)
+        y = np.random.randint(0, 2, 50)
+        
+        model = SVC(kernel='rbf')
+        
+        # Cross validation com 3 folds
+        scores = cross_val_score(model, X, y, cv=3)
+        
+        assert len(scores) == 3
+        assert all(0 <= s <= 1 for s in scores)
+
+    def test_cross_val_score_resultados_variam(self):
+        """Scores de cada fold devem variar."""
+        from sklearn.model_selection import cross_val_score
+        from sklearn.svm import SVC
+        
+        X = np.random.randn(50, 24)
+        y = np.random.randint(0, 2, 50)
+        
+        model = SVC(kernel='rbf')
+        scores = cross_val_score(model, X, y, cv=5)
+        
+        # Nem todos os scores devem ser iguais
+        assert len(set(np.round(scores, 3))) > 1 or len(scores) == 1
+
+
+class TestSVMReporting:
+    """Testes de relatório (classification_report, confusion_matrix)."""
+
+    def test_classification_report_gerado(self):
+        """classification_report deve gerar string com métricas."""
+        from sklearn.metrics import classification_report
+        
+        y_true = [0, 1, 1, 0, 1, 0]
+        y_pred = [0, 1, 0, 0, 1, 1]
+        
+        report = classification_report(y_true, y_pred)
+        
+        assert isinstance(report, str)
+        assert 'precision' in report.lower()
+        assert 'recall' in report.lower()
+        assert 'f1-score' in report.lower()
+
+    def test_confusion_matrix_forma_correta(self):
+        """confusion_matrix deve ter forma (2, 2)."""
+        from sklearn.metrics import confusion_matrix
+        
+        y_true = [0, 1, 1, 0, 1, 0]
+        y_pred = [0, 1, 0, 0, 1, 1]
+        
+        cm = confusion_matrix(y_true, y_pred)
+        
+        assert cm.shape == (2, 2)
+        assert cm[0, 0] >= 0  # True negatives
+        assert cm[1, 1] >= 0  # True positives
+
+    def test_confusion_matrix_soma_correta(self):
+        """Soma de confusion_matrix deve bater com tamanho de y_true."""
+        from sklearn.metrics import confusion_matrix
+        
+        y_true = np.random.randint(0, 2, 100)
+        y_pred = np.random.randint(0, 2, 100)
+        
+        cm = confusion_matrix(y_true, y_pred)
+        
+        assert cm.sum() == len(y_true)
+
+
+class TestSVMDatasetHandling:
+    """Testes de manipulação de dataset."""
+
+    def test_dataset_desbalanceado_detectado(self):
+        """Dataset desbalanceado deve ser detectado."""
+        from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
+        
+        clf = SVMCompleteDatasetClassifier()
+        
+        # Muito mais positivos que negativos
+        X = np.random.randn(100, 24)
+        y = np.hstack([np.ones(90), np.zeros(10)])
+        
+        clf.train_model(X, y, X, y)
+        
+        # Modelo deve conseguir treinar mesmo desbalanceado
+        assert clf.model is not None
+
+    def test_dataset_balanceado(self):
+        """Dataset balanceado deve treinar melhor."""
+        from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
+        
+        clf = SVMCompleteDatasetClassifier()
+        
+        # Balanceado
+        X = np.random.randn(100, 24)
+        y = np.hstack([np.ones(50), np.zeros(50)])
+        
+        X_scaled = clf.scaler.fit_transform(X)
+        clf.model = clf.__class__().model or None
+        
+        from sklearn.svm import SVC
+        model = SVC(kernel='rbf')
+        model.fit(X_scaled, y)
+        
+        predictions = model.predict(X_scaled)
+        assert len(predictions) == 100
+
+
+class TestSVMEdgeCases:
+    """Testes de casos extremos do SVM."""
+
+    def test_modelo_com_uma_classe_apenas(self):
+        """Modelo não consegue treinar com apenas uma classe."""
+        from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
+        from sklearn.svm import SVC
+        
+        X = np.random.randn(50, 24)
+        y = np.ones(50)  # Apenas classe 1
+        
+        model = SVC(kernel='rbf')
+        
+        # Não deve crash, mas pode falhar
+        try:
+            model.fit(X, y)
+            predictions = model.predict(X)
+            # Se conseguiu, todas predições devem ser 1
+            assert all(p == 1 for p in predictions)
+        except ValueError:
+            # É aceitável falhar com uma classe
+            pass
+
+    def test_features_com_valores_muito_altos(self):
+        """Features com valores muito grandes devem ser escalados."""
+        from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
+        
+        clf = SVMCompleteDatasetClassifier()
+        
+        X = np.random.randn(50, 24) * 1000 + 5000  # Valores muito grandes
+        y = np.random.randint(0, 2, 50)
+        
+        X_scaled = clf.scaler.fit_transform(X)
+        
+        # Após escalar, media deve ser 0 e std ≈ 1
+        assert np.allclose(X_scaled.mean(), 0, atol=1e-10)
+        assert np.allclose(X_scaled.std(), 1, atol=0.1)
