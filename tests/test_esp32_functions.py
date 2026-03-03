@@ -231,6 +231,36 @@ class TestCallEsp32Api:
         # Assert
         assert result is None
 
+    def test_call_esp32_api_get_usa_timeout_hardcoded(self, mock_requests_get):
+        """GET na API ESP32 deve usar timeout fixo de 25s."""
+        esp32.esp32_jwt_token = 'valid_token'
+        esp32.esp32_token_expiry = datetime.now().timestamp() + 3600
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'ok': True}
+        mock_requests_get.return_value = mock_response
+
+        esp32.call_esp32_api('/api/sensors', method='GET')
+
+        call_args = mock_requests_get.call_args
+        assert call_args.kwargs['timeout'] == 25
+
+    def test_call_esp32_api_post_usa_timeout_hardcoded(self, mock_requests_post):
+        """POST na API ESP32 deve usar timeout fixo de 25s."""
+        esp32.esp32_jwt_token = 'valid_token'
+        esp32.esp32_token_expiry = datetime.now().timestamp() + 3600
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'ok': True}
+        mock_requests_post.return_value = mock_response
+
+        esp32.call_esp32_api('/api/check_mechanical', method='POST', data={'peso': 2600, 'presenca': True})
+
+        call_args = mock_requests_post.call_args
+        assert call_args.kwargs['timeout'] == 25
+
 
 # =============================================================================
 # TestGetEsp32Sensors
@@ -417,3 +447,20 @@ class TestEsp32EnvHelpers:
         """Helper de credencial deve priorizar ESP32_DEVICE_KEY do ambiente."""
         with patch.dict('os.environ', {'ESP32_DEVICE_KEY': 'device-key-abc'}):
             assert esp32._get_esp32_device_key() == 'device-key-abc'
+
+
+class TestEsp32TimeoutConfig:
+    """Testes para garantir timeouts fixos (hardcoded)."""
+
+    def test_get_esp32_jwt_token_usa_timeout_30(self, mock_requests_post):
+        """Login JWT deve usar timeout fixo de 30s."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'token': 'abc', 'expires_in': 3600}
+        mock_requests_post.return_value = mock_response
+
+        token = esp32.get_esp32_jwt_token()
+
+        assert token == 'abc'
+        call_args = mock_requests_post.call_args
+        assert call_args.kwargs['timeout'] == 30
