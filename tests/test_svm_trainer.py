@@ -241,6 +241,21 @@ class TestLoadDataset:
             assert y.ndim == 1
             assert all(label in [0, 1] for label in y)
 
+    def test_load_dataset_include_validation_true_returns_four_arrays(self, classifier):
+        """Com include_validation=True deve retornar X_train, y_train, X_val, y_val."""
+        with patch.object(classifier, 'extract_color_features', return_value=np.zeros(24)):
+            with patch('pathlib.Path.exists', return_value=False):
+                result = classifier.load_dataset(include_validation=True)
+
+        assert isinstance(result, tuple)
+        assert len(result) == 4
+
+        x_train, y_train, x_val, y_val = result
+        assert isinstance(x_train, np.ndarray)
+        assert isinstance(y_train, np.ndarray)
+        assert isinstance(x_val, np.ndarray)
+        assert isinstance(y_val, np.ndarray)
+
 
 # =============================================================================
 # TestTrainModel

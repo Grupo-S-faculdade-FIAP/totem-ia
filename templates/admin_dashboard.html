@@ -584,7 +584,17 @@
 
         async function loadDashboard() {
             try {
-                const response = await fetch('/api/admin/dashboard');
+                const token = localStorage.getItem('admin_token');
+                if (!token) {
+                    window.location.href = '/admin';
+                    return;
+                }
+
+                const response = await fetch('/api/admin/dashboard', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
                 const data = await response.json();
 
                 if (response.ok) {
@@ -595,6 +605,10 @@
                     updateLastUpdate();
                 } else {
                     console.error('Erro ao carregar dados:', data.error);
+                    if (response.status === 401 || response.status === 403) {
+                        localStorage.removeItem('admin_token');
+                        window.location.href = '/admin';
+                    }
                 }
             } catch (error) {
                 console.error('Erro na requisição:', error);
@@ -786,6 +800,7 @@
             if (confirm('Tem certeza que deseja sair?')) {
                 localStorage.removeItem('admin_username');
                 localStorage.removeItem('admin_remember');
+                localStorage.removeItem('admin_token');
                 window.location.href = '/admin';
             }
         }

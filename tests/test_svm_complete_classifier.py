@@ -294,6 +294,19 @@ class TestSVMDatasetLoading:
                     if len(y) > 0:
                         assert set(y).issubset({0, 1})
 
+    def test_load_dataset_include_validation_true_retorna_quatro_arrays(self):
+        """load_dataset(include_validation=True) deve manter modo completo."""
+        from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
+
+        clf = SVMCompleteDatasetClassifier()
+
+        with patch.object(clf, 'extract_color_features', return_value=np.zeros(24)):
+            with patch('pathlib.Path.exists', return_value=False):
+                result = clf.load_dataset(include_validation=True)
+
+        assert isinstance(result, tuple)
+        assert len(result) == 4
+
 
 class TestSVMIntegrationComplete:
     """Testes de integração completa do SVM."""

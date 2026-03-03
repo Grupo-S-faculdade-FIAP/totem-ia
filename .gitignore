@@ -56,9 +56,11 @@ logs/
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
 .nox/
+.hypothesis/
 
 # Jupyter Notebook
 .ipynb_checkpoints

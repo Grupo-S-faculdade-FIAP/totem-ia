@@ -26,6 +26,22 @@ import numpy as np
 TOTEM_API_URL = "http://localhost:8000"
 ESP32_API_URL = "http://localhost:5001"
 
+
+def _service_available(url: str) -> bool:
+    """Verifica disponibilidade de serviço HTTP para testes live."""
+    try:
+        requests.get(url, timeout=2)
+        return True
+    except requests.exceptions.RequestException:
+        return False
+
+
+if not _service_available(f"{TOTEM_API_URL}/") and not _service_available(f"{ESP32_API_URL}/api/health"):
+    pytest.skip(
+        "Serviços TOTEM/ESP32 locais indisponíveis para testes de integração live",
+        allow_module_level=True
+    )
+
 # Criar imagem de teste se não existir
 def create_test_image():
     """Cria uma imagem de teste simples"""

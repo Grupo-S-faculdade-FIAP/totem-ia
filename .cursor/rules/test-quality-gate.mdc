@@ -1,0 +1,32 @@
+---
+description: Gate de qualidade para testes Python (clareza, robustez e valor de regressão)
+globs: ["test_*.py", "tests/**/*.py"]
+alwaysApply: false
+---
+
+# ✅ Gate de Qualidade de Testes
+
+Antes de finalizar qualquer teste, validar este gate:
+
+1. **Valor de negócio**
+   - Este teste detecta regressão real de comportamento?
+2. **Sinal alto**
+   - A causa de falha é única e clara?
+3. **Baixo acoplamento**
+   - O teste valida contrato externo, não detalhe interno frágil?
+4. **Determinismo**
+   - Sem dependência de tempo real, rede real ou ordem de execução?
+5. **Legibilidade**
+   - Nome, Arrange e Assert explicam a intenção sem esforço?
+
+## Regras objetivas
+
+- Obrigatório usar AAA
+- Evitar mais de 5 asserts não relacionados no mesmo teste
+- Evitar `sleep` e dependência de relógio real
+- Mockar apenas dependências externas (rede, hardware, IA remota)
+- Para API, validar `status_code` e payload essencial
+
+## Critério de reprovação
+
+Se o teste for frágil a refactor interno legítimo, ele deve ser reescrito.

@@ -13,13 +13,24 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
-ESP32_API_URL = os.getenv('ESP32_API_URL', 'https://esp32-totem-server.onrender.com')
-ESP32_DEVICE_KEY = os.getenv('ESP32_DEVICE_KEY', 'xxxxxxxxx')
-JWT_SECRET = os.getenv('JWT_SECRET', 'xxxxxxxxx')
+# Constantes de fallback para compatibilidade e testes.
+ESP32_API_URL = 'https://esp32-totem-server.onrender.com'
+ESP32_DEVICE_KEY = 'xxxxxxxxx'
+JWT_SECRET = 'xxxxxxxxx'
 
 # Token JWT cache
 esp32_jwt_token = None
 esp32_token_expiry = None
+
+
+def _get_esp32_api_url() -> str:
+    """Retorna URL da API ESP32 a partir do ambiente."""
+    return os.getenv('ESP32_API_URL', ESP32_API_URL)
+
+
+def _get_esp32_device_key() -> str:
+    """Retorna credencial device key do ambiente."""
+    return os.getenv('ESP32_DEVICE_KEY', ESP32_DEVICE_KEY)
 
 
 def get_esp32_jwt_token() -> str | None:
@@ -33,14 +44,17 @@ def get_esp32_jwt_token() -> str | None:
 
     try:
         logger.info("🔐 ESP32: Realizando login para obter JWT token...")
-        logger.info(f"   URL: {ESP32_API_URL}/api/auth/login")
-        logger.info(f"   Device ID: {ESP32_DEVICE_KEY}")
+        api_url = _get_esp32_api_url()
+        device_key = _get_esp32_device_key()
+
+        logger.info(f"   URL: {api_url}/api/auth/login")
+        logger.info(f"   Device ID: {device_key}")
 
         login_response = requests.post(
-            f"{ESP32_API_URL}/api/auth/login",
+            f"{api_url}/api/auth/login",
             json={
-                "device_id": ESP32_DEVICE_KEY,
-                "device_key": ESP32_DEVICE_KEY
+                "device_id": device_key,
+                "device_key": device_key
             },
             timeout=15
         )
@@ -78,7 +92,7 @@ def call_esp32_api(endpoint: str, method: str = 'GET', data: dict | None = None)
         'Content-Type': 'application/json'
     }
     
-    url = f"{ESP32_API_URL}{endpoint}"
+    url = f"{_get_esp32_api_url()}{endpoint}"
     
     logger.info(f"📡 ESP32 REQUEST: {method} {endpoint}")
     if data:

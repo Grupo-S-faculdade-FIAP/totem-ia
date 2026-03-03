@@ -385,6 +385,10 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
+                    if (data.token) {
+                        localStorage.setItem('admin_token', data.token);
+                    }
+
                     if (rememberInput.checked) {
                         localStorage.setItem('admin_username', username);
                         localStorage.setItem('admin_remember', 'true');
@@ -401,10 +405,12 @@
                 } else {
                     showAlert(data.message || 'Usuário ou senha inválidos', 'error');
                     passwordInput.value = '';
+                    localStorage.removeItem('admin_token');
                 }
             } catch (error) {
                 console.error('Erro:', error);
                 showAlert('Erro ao conectar com o servidor', 'error');
+                localStorage.removeItem('admin_token');
             } finally {
                 loginBtn.disabled = false;
                 loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Entrar';

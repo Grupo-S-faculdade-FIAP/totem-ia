@@ -1,0 +1,36 @@
+---
+description: Skill para revisar e elevar a qualidade de testes existentes com checklist objetivo
+globs: ["test_*.py", "tests/**/*.py"]
+alwaysApply: false
+---
+
+# 🔍 Skill: Revisão de Qualidade de Testes
+
+## Quando usar
+
+Ao revisar testes existentes que passam, mas podem estar frágeis, acoplados ou com baixo valor.
+
+## Processo de revisão (rápido)
+
+1. Identificar o comportamento que cada teste pretende proteger
+2. Medir qualidade com nota de 0 a 2 nos critérios:
+   - valor de regressão
+   - clareza de intenção
+   - robustez a refactor
+   - determinismo
+   - diagnóstico de falha
+3. Reescrever os testes com nota < 8/10
+
+## Checklist de melhorias
+
+- Nome do teste descreve efeito observável
+- Arrange mínimo (sem ruído)
+- Assert focado em contrato
+- Sem detalhes internos desnecessários
+- Sem dependência de ordem/estado global
+
+## Saída esperada da revisão
+
+- Lista curta de riscos encontrados
+- Trechos reescritos com melhor sinal-ruído
+- Nota final de qualidade por teste crítico
