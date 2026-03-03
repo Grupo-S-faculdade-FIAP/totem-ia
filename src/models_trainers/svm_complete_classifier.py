@@ -228,7 +228,7 @@ class SVMCompleteDatasetClassifier:
             return X_train, y_train, X_val, y_val
         return X_train, y_train
 
-    def train_model(self, X_train, y_train, X_val, y_val):
+    def train_model(self, X_train, y_train, X_val, y_val, auto_save: bool = False):
         """Treina o modelo SVM com validação cruzada"""
         logger.info("Normalizando features...")
         X_train_scaled = self.scaler.fit_transform(X_train)
@@ -266,8 +266,9 @@ class SVMCompleteDatasetClassifier:
         logger.info(f"   Acurácia Treino: {train_acc:.4f}")
         logger.info(f"   Acurácia Validação: {val_acc:.4f}")
         
-        # Salvar modelo
-        self.save_model()
+        # Salvar modelo apenas quando solicitado explicitamente
+        if auto_save:
+            self.save_model()
 
     def save_model(self):
         """Salva o modelo e scaler"""
@@ -294,7 +295,7 @@ def main():
     
     # Treinar modelo
     logger.info("Treinando modelo...")
-    classifier.train_model(X_train, y_train, X_val, y_val)
+    classifier.train_model(X_train, y_train, X_val, y_val, auto_save=True)
     
     print('\n✅ Modelo treinado com sucesso!')
     print('='*70)
