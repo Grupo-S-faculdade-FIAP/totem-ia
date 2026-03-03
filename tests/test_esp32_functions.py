@@ -403,3 +403,17 @@ class TestCalculateEnvironmentalImpact:
         assert result['co2_evitado_g'] == 2.3
         assert result['agua_economizada_ml'] == 15
         assert result['arvores_preservadas_cm2'] == 8
+
+
+class TestEsp32EnvHelpers:
+    """Testes para helpers internos de ambiente."""
+
+    def test_get_esp32_api_url_usa_env(self):
+        """Helper de URL deve priorizar ESP32_API_URL do ambiente."""
+        with patch.dict('os.environ', {'ESP32_API_URL': 'http://esp32-local:5001'}):
+            assert esp32._get_esp32_api_url() == 'http://esp32-local:5001'
+
+    def test_get_esp32_device_key_usa_env(self):
+        """Helper de credencial deve priorizar ESP32_DEVICE_KEY do ambiente."""
+        with patch.dict('os.environ', {'ESP32_DEVICE_KEY': 'device-key-abc'}):
+            assert esp32._get_esp32_device_key() == 'device-key-abc'

@@ -38,6 +38,7 @@ venv.bak/
 *.swo
 *~
 .DS_Store
+node_modules/
 
 # Environment variables
 .env
@@ -56,9 +57,14 @@ logs/
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
 .nox/
+.hypothesis/
+playwright-report/
+test-results/
+.playwright-browsers/
 
 # Jupyter Notebook
 .ipynb_checkpoints

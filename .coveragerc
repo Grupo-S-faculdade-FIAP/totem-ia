@@ -1,11 +1,13 @@
 [run]
 # Configuração de cobertura de código
-source = src, app.py
+source = src
 omit =
     */site-packages/*
     */venv/*
     */__pycache__/*
     */tests/*
+    src/models_classifiers/*
+    src/models_trainers/*
 
 [report]
 # Relatório de cobertura

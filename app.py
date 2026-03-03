@@ -6,7 +6,6 @@ import os
 import base64
 import time
 import traceback
-import random
 
 import cv2
 import joblib
@@ -28,6 +27,7 @@ from dotenv import load_dotenv
 # from prompts.agents_config import get_agent
 
 from src.modules.image import ImageClassifier
+from src.modules.sprint3_analytics import build_analytics_report, build_daily_trend, is_admin_authenticated
 
 from src.hardware.esp32 import ESP32_API_URL, get_esp32_sensors, calculate_environmental_impact, check_esp32_mechanical, confirm_esp32_detection
 
@@ -805,16 +805,23 @@ def api_admin_login():
         data = request.get_json()
         username = data.get('username', '').strip()
         password = data.get('password', '').strip()
+
+        if not username or not password:
+            return jsonify({
+                'success': False,
+                'message': 'Usuário e senha são obrigatórios'
+            }), 400
         
         ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
         ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
+        admin_token = os.getenv('ADMIN_TOKEN', 'admin_token')
         
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             logger.info(f"✅ Login bem-sucedido para usuário: {username}")
             return jsonify({
                 'success': True,
                 'message': 'Login realizado com sucesso!',
-                'token': 'admin_token'  # Em produção, usar JWT
+                'token': admin_token  # Em produção, usar JWT assinado/expirável
             }), 200
         else:
             logger.warning(f"❌ Tentativa de login falhada para: {username}")
@@ -831,28 +838,159 @@ def api_admin_login():
         }), 500
 
 
+@app.route('/api/debug-confirm', methods=['POST'])
+def api_debug_confirm():
+    """Confirma detecção manual em ambiente de desenvolvimento."""
+    try:
+        if not MODO_DEBUG:
+            return jsonify({
+                'status': 'erro',
+                'error': 'Rota disponível apenas no modo debug',
+                'timestamp': datetime.now().isoformat()
+            }), 403
+
+        if not request.is_json:
+            return jsonify({
+                'status': 'erro',
+                'error': 'Payload JSON obrigatório',
+                'timestamp': datetime.now().isoformat()
+            }), 400
+
+        data = request.get_json() or {}
+        detection_type = str(data.get('detection_type', '')).strip().lower()
+        confidence = float(data.get('confidence', 1.0))
+
+        if detection_type not in {'tampinha', 'nao_tampinha', 'não_tampinha'}:
+            return jsonify({
+                'status': 'erro',
+                'error': 'detection_type inválido',
+                'timestamp': datetime.now().isoformat()
+            }), 400
+
+        if db_connection:
+            with db_connection as db:
+                if detection_type == 'tampinha':
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO)
+                else:
+                    db.save_interaction(DatabaseConnection.ResultadoInteracao.REJEITADO)
+
+        return jsonify({
+            'status': 'sucesso',
+            'message': 'Confirmação debug registrada',
+            'detection_type': detection_type,
+            'confidence': confidence,
+            'timestamp': datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        logger.error(f"❌ Erro em /api/debug-confirm: {e}", exc_info=True)
+        return jsonify({
+            'status': 'erro',
+            'error': 'Erro interno ao confirmar debug',
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+
+@app.route('/api/save_deposit', methods=['POST'])
+def api_save_deposit():
+    """Salva depósito manual com classificação para testes e integração."""
+    try:
+        if not request.is_json:
+            return jsonify({
+                'status': 'erro',
+                'error': 'Payload JSON obrigatório',
+                'timestamp': datetime.now().isoformat()
+            }), 400
+
+        data = request.get_json() or {}
+        if 'image' not in data:
+            return jsonify({
+                'status': 'erro',
+                'error': 'Nenhuma imagem fornecida',
+                'timestamp': datetime.now().isoformat()
+            }), 400
+
+        image_data = data['image'].split(',')[1] if ',' in data['image'] else data['image']
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image is None:
+            return jsonify({
+                'status': 'erro',
+                'error': 'Erro ao processar imagem',
+                'timestamp': datetime.now().isoformat()
+            }), 400
+
+        pred, conf, _, _ = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if image_classifier else (None, None, None, None)
+        if pred != 1:
+            return jsonify({
+                'status': 'rejeitado',
+                'message': 'Item não classificado como tampinha',
+                'timestamp': datetime.now().isoformat()
+            }), 400
+
+        final_confidence = float(data.get('confidence', conf if conf is not None else 0.0))
+        deposit_id = None
+        if db_connection:
+            with db_connection as db:
+                deposit_id = db.save_deposit_data(final_confidence, True, True, 2500, 0.5)
+                db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO, deposit_id)
+
+        return jsonify({
+            'status': 'sucesso',
+            'message': 'Depósito salvo com sucesso',
+            'deposit_id': deposit_id,
+            'confidence': final_confidence,
+            'timestamp': datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        logger.error(f"❌ Erro em /api/save_deposit: {e}", exc_info=True)
+        return jsonify({
+            'status': 'erro',
+            'error': 'Erro interno ao salvar depósito',
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+
+def _ensure_db_connection() -> DatabaseConnection:
+    """Garante conexão de banco inicializada para uso nas rotas."""
+    global db_connection
+    if db_connection is None:
+        db_connection = DatabaseConnection()
+        db_connection.init_db()
+    return db_connection
+
+
 @app.route('/api/admin/dashboard', methods=['GET'])
 def api_admin_dashboard():
     """
     Retorna dados para o dashboard admin
     """
     try:
-        from datetime import timedelta
-        
-        if db_connection:
-            with db_connection as db:
-                deposits = db.get_all_deposits()
-                num_interactions = db.get_total_interacoes()
+        expected_token = os.getenv('ADMIN_TOKEN', 'admin_token')
+        auth_header = request.headers.get('Authorization', '').strip()
+        if not is_admin_authenticated(auth_header, expected_token):
+            return jsonify({
+                'status': 'erro',
+                'error': 'Acesso não autorizado',
+                'timestamp': datetime.now().isoformat()
+            }), 401
+
+        with _ensure_db_connection() as db:
+            deposits = db.get_all_deposits()
+            num_interactions = db.get_total_interacoes()
 
         total_tampinhas = num_interactions
         aceitas = len(deposits)
-        rejeitadas = num_interactions - aceitas
+        rejeitadas = max(num_interactions - aceitas, 0)
         
         stats = {
             'total': total_tampinhas,
             'aceitas': aceitas,
             'rejeitadas': rejeitadas,
-            'impacto': (sum(deposit['weight_value'] for deposit in deposits) / 1000.0) * 0.002,
+            'impacto': (
+                sum(float(deposit.get('weight_value') or 0) for deposit in deposits) / 1000.0
+            ) * 0.002,
             'changeTotal': 0,
             'changeTaxa': 0,
             'changeRejeitadas': 0,
@@ -862,16 +1000,9 @@ def api_admin_dashboard():
             'year': 0
         }
         
-        # Dados de tendência (últimos 7 dias)
-        today = datetime.now()
-        trend_labels = [(today - timedelta(days=i)).strftime('%a') for i in range(6, -1, -1)]
-        trend_values = [random.randint(150, 300) for _ in range(7)]
-        trend = {
-            'labels': trend_labels,
-            'values': trend_values
-        }
+        trend = build_daily_trend(deposits, days=7)
         
-        last_deposits = deposits[-10:]
+        last_deposits = deposits[:10]
         
         return jsonify({
             'success': True,
@@ -885,6 +1016,38 @@ def api_admin_dashboard():
         return jsonify({
             'success': False,
             'error': str(e)
+        }), 500
+
+
+@app.route('/api/admin/analytics-report', methods=['GET'])
+def api_admin_analytics_report():
+    """Relatório analítico consolidado para entrega integrada da Sprint 3."""
+    try:
+        expected_token = os.getenv('ADMIN_TOKEN', 'admin_token')
+        auth_header = request.headers.get('Authorization', '').strip()
+        if not is_admin_authenticated(auth_header, expected_token):
+            return jsonify({
+                'status': 'erro',
+                'error': 'Acesso não autorizado',
+                'timestamp': datetime.now().isoformat()
+            }), 401
+
+        with _ensure_db_connection() as db:
+            deposits = db.get_all_deposits()
+            interactions = db.get_all_interactions()
+
+        report = build_analytics_report(deposits, interactions)
+        return jsonify({
+            'success': True,
+            'report': report,
+            'timestamp': datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        logger.error(f"❌ Erro ao gerar relatório analítico: {e}", exc_info=True)
+        return jsonify({
+            'status': 'erro',
+            'error': 'Erro interno ao gerar relatório analítico',
+            'timestamp': datetime.now().isoformat()
         }), 500
 
 

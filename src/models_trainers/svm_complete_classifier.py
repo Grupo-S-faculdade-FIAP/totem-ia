@@ -100,7 +100,7 @@ class SVMCompleteDatasetClassifier:
             logger.error(f"Erro ao extrair features: {e}")
             return None
 
-    def load_dataset(self):
+    def load_dataset(self, include_validation: bool = False):
         """
         Carrega dataset completo:
         - POSITIVOS: color-cap/train (2100) + tampinhas/ (4)
@@ -117,14 +117,17 @@ class SVMCompleteDatasetClassifier:
         logger.info(f"Carregando COLOR-CAP/TRAIN ({train_path})...")
         
         count_colorcap = 0
-        for img_file in tqdm(sorted(os.listdir(train_path)), desc="Color-CAP", leave=False):
-            img_path = train_path / img_file
-            features = self.extract_color_features(str(img_path))
-            
-            if features is not None and not np.isnan(features).any():
-                X_train.append(features)
-                y_train.append(1)  # TAMPINHA
-                count_colorcap += 1
+        if train_path.exists():
+            for img_file in tqdm(sorted(os.listdir(train_path)), desc="Color-CAP", leave=False):
+                img_path = train_path / img_file
+                features = self.extract_color_features(str(img_path))
+                
+                if features is not None and not np.isnan(features).any():
+                    X_train.append(features)
+                    y_train.append(1)  # TAMPINHA
+                    count_colorcap += 1
+        else:
+            logger.warning(f"⚠️ Pasta não encontrada: {train_path}")
         
         logger.info(f"   ✅ Carregadas {count_colorcap} imagens do color-cap")
         
@@ -195,14 +198,17 @@ class SVMCompleteDatasetClassifier:
         X_val = []
         y_val = []
         count_val = 0
-        for img_file in tqdm(sorted(os.listdir(valid_path)), desc="Validação", leave=False):
-            img_path = valid_path / img_file
-            features = self.extract_color_features(str(img_path))
-            
-            if features is not None and not np.isnan(features).any():
-                X_val.append(features)
-                y_val.append(1)  # TODAS SÃO TAMPINHAS
-                count_val += 1
+        if valid_path.exists():
+            for img_file in tqdm(sorted(os.listdir(valid_path)), desc="Validação", leave=False):
+                img_path = valid_path / img_file
+                features = self.extract_color_features(str(img_path))
+                
+                if features is not None and not np.isnan(features).any():
+                    X_val.append(features)
+                    y_val.append(1)  # TODAS SÃO TAMPINHAS
+                    count_val += 1
+        else:
+            logger.warning(f"⚠️ Pasta não encontrada: {valid_path}")
         
         X_train = np.array(X_train)
         y_train = np.array(y_train)
@@ -218,9 +224,11 @@ class SVMCompleteDatasetClassifier:
         logger.info(f"   VALIDAÇÃO: {count_val} imagens (todas tampinhas)")
         logger.info(f"   TOTAL: {len(X_train) + len(X_val)} imagens")
         
-        return X_train, y_train, X_val, y_val
+        if include_validation:
+            return X_train, y_train, X_val, y_val
+        return X_train, y_train
 
-    def train_model(self, X_train, y_train, X_val, y_val):
+    def train_model(self, X_train, y_train, X_val, y_val, auto_save: bool = False):
         """Treina o modelo SVM com validação cruzada"""
         logger.info("Normalizando features...")
         X_train_scaled = self.scaler.fit_transform(X_train)
@@ -258,8 +266,9 @@ class SVMCompleteDatasetClassifier:
         logger.info(f"   Acurácia Treino: {train_acc:.4f}")
         logger.info(f"   Acurácia Validação: {val_acc:.4f}")
         
-        # Salvar modelo
-        self.save_model()
+        # Salvar modelo apenas quando solicitado explicitamente
+        if auto_save:
+            self.save_model()
 
     def save_model(self):
         """Salva o modelo e scaler"""
@@ -282,11 +291,11 @@ def main():
     
     # Carregar dataset
     logger.info("Carregando dataset completo...")
-    X_train, y_train, X_val, y_val = classifier.load_dataset()
+    X_train, y_train, X_val, y_val = classifier.load_dataset(include_validation=True)
     
     # Treinar modelo
     logger.info("Treinando modelo...")
-    classifier.train_model(X_train, y_train, X_val, y_val)
+    classifier.train_model(X_train, y_train, X_val, y_val, auto_save=True)
     
     print('\n✅ Modelo treinado com sucesso!')
     print('='*70)

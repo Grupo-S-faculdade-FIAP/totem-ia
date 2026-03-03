@@ -23,6 +23,19 @@ ESP32_API_URL = "http://localhost:5001"
 DEVICE_ID = "xxxxxxxxx"
 DEVICE_KEY = "xxxxxxxxx"
 
+
+def _esp32_available() -> bool:
+    """Verifica se o servidor ESP32 local está disponível."""
+    try:
+        requests.get(f"{ESP32_API_URL}/api/health", timeout=2)
+        return True
+    except requests.exceptions.RequestException:
+        return False
+
+
+if not _esp32_available():
+    pytest.skip("ESP32 Server local indisponível para testes live", allow_module_level=True)
+
 # ============================================================================
 # FIXTURES
 # ============================================================================

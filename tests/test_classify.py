@@ -9,6 +9,7 @@ import pytest
 import numpy as np
 import cv2
 from unittest.mock import MagicMock
+from pathlib import Path
 
 from src.modules.image import ImageClassifier
 
@@ -199,3 +200,108 @@ class TestClassifyImage:
         image = create_image_with_saturation(75)
         pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=False)
         assert method == "NORMAL_SAT_TAMPINHA"
+
+
+class TestImageClassifierErrorPaths:
+    """Cobertura de caminhos de erro/fallback do classificador."""
+
+    def test_load_classifier_retorna_none_quando_arquivos_nao_existem(self, monkeypatch):
+        """Sem arquivos de modelo/scaler, deve manter atributos None."""
+        clf = ImageClassifier()
+        monkeypatch.setattr('src.modules.image.MODEL_PATH', Path('/tmp/arquivo_inexistente_model.pkl'))
+        monkeypatch.setattr('src.modules.image.SCALER_PATH', Path('/tmp/arquivo_inexistente_scaler.pkl'))
+
+        clf.load_classifier()
+
+        assert clf.model is None
+        assert clf.scaler is None
+
+    def test_load_classifier_trata_excecao_do_joblib(self, monkeypatch, tmp_path):
+        """Exceção no joblib.load deve ser tratada sem crash."""
+        model_file = tmp_path / 'model.pkl'
+        scaler_file = tmp_path / 'scaler.pkl'
+        model_file.write_bytes(b'x')
+        scaler_file.write_bytes(b'y')
+
+        clf = ImageClassifier()
+        monkeypatch.setattr('src.modules.image.MODEL_PATH', model_file)
+        monkeypatch.setattr('src.modules.image.SCALER_PATH', scaler_file)
+        monkeypatch.setattr('src.modules.image.joblib.load', lambda _: (_ for _ in ()).throw(RuntimeError('erro')))
+
+        clf.load_classifier()
+
+        assert clf.model is None
+        assert clf.scaler is None
+
+    def test_load_classifier_sucesso_define_model_e_scaler(self, monkeypatch, tmp_path):
+        """Quando arquivos existem e load funciona, atributos devem ser preenchidos."""
+        model_file = tmp_path / 'model_ok.pkl'
+        scaler_file = tmp_path / 'scaler_ok.pkl'
+        model_file.write_bytes(b'model')
+        scaler_file.write_bytes(b'scaler')
+
+        fake_model = MagicMock(name='fake_model')
+        fake_scaler = MagicMock(name='fake_scaler')
+
+        def fake_load(path: str):
+            if str(model_file) in path:
+                return fake_model
+            return fake_scaler
+
+        clf = ImageClassifier()
+        monkeypatch.setattr('src.modules.image.MODEL_PATH', model_file)
+        monkeypatch.setattr('src.modules.image.SCALER_PATH', scaler_file)
+        monkeypatch.setattr('src.modules.image.joblib.load', fake_load)
+
+        clf.load_classifier()
+
+        assert clf.model is fake_model
+        assert clf.scaler is fake_scaler
+
+    def test_extract_features_converte_dtype_para_uint8(self):
+        """Imagem float32 válida deve ser convertida para uint8 e processada."""
+        clf = ImageClassifier()
+        image = create_image_with_saturation(80).astype(np.float32)
+
+        features = clf.extract_color_features(image)
+
+        assert features is not None
+        assert features.shape == (8,)
+
+    def test_extract_features_trata_excecao_interna(self, monkeypatch):
+        """Erro interno em cv2.resize deve retornar None."""
+        clf = ImageClassifier()
+        image = create_image_with_saturation(90)
+        monkeypatch.setattr('src.modules.image.cv2.resize', lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError('falha')))
+
+        result = clf.extract_color_features(image)
+
+        assert result is None
+
+    def test_classify_image_trata_features_nan(self):
+        """Features com NaN devem gerar retorno de erro padronizado."""
+        clf = ImageClassifier()
+        clf.model = MagicMock()
+        clf.scaler = MagicMock()
+        clf.extract_color_features = MagicMock(return_value=np.array([np.nan] * 8))
+
+        pred, conf, sat, method = clf.classify_image(create_image_with_saturation(100))
+
+        assert pred is None
+        assert conf is None
+        assert sat is None
+        assert method == "ERRO"
+
+    def test_classify_image_trata_excecao_no_fluxo(self):
+        """Exceção no scaler/model deve retornar erro sem propagar."""
+        clf = ImageClassifier()
+        clf.model = MagicMock()
+        clf.scaler = MagicMock()
+        clf.scaler.transform.side_effect = RuntimeError('falha scaler')
+
+        pred, conf, sat, method = clf.classify_image(create_image_with_saturation(110))
+
+        assert pred is None
+        assert conf is None
+        assert sat is None
+        assert method == "ERRO"

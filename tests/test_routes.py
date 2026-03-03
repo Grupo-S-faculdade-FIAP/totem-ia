@@ -319,6 +319,22 @@ class TestAdminRoutes:
             data = response.get_json()
             assert 'token' in data or 'message' in data
 
+    def test_api_admin_login_retorna_admin_token_do_ambiente(self, client):
+        """Login válido deve retornar o token definido em ADMIN_TOKEN."""
+        with patch.dict('os.environ', {
+            'ADMIN_USERNAME': 'admin',
+            'ADMIN_PASSWORD': 'senha123',
+            'ADMIN_TOKEN': 'token_customizado_123'
+        }):
+            response = client.post('/api/admin/login', json={
+                'username': 'admin',
+                'password': 'senha123'
+            })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['token'] == 'token_customizado_123'
+
     def test_api_admin_dashboard_sem_autenticacao(self, client):
         """Dashboard sem autenticação → 401 ou 403."""
         response = client.get('/api/admin/dashboard')
@@ -331,6 +347,79 @@ class TestAdminRoutes:
             headers={'Authorization': 'Bearer invalid_token'}
         )
         assert response.status_code in (401, 403)
+
+    def test_api_admin_dashboard_com_token_valido(self, client):
+        """Dashboard com token válido deve retornar dados consolidados."""
+        fake_deposits = [
+            {'timestamp': 1700000000.0, 'weight_value': 2500},
+            {'timestamp': 1700003600.0, 'weight_value': 2600},
+        ]
+
+        with patch('app._ensure_db_connection') as mock_db_factory:
+            fake_db = MagicMock()
+            fake_db.get_all_deposits.return_value = fake_deposits
+            fake_db.get_total_interacoes.return_value = 3
+
+            fake_context = MagicMock()
+            fake_context.__enter__.return_value = fake_db
+            fake_context.__exit__.return_value = None
+            mock_db_factory.return_value = fake_context
+
+            response = client.get(
+                '/api/admin/dashboard',
+                headers={'Authorization': 'Bearer admin_token'}
+            )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert 'trend' in data
+        assert len(data['trend']['labels']) == 7
+        assert len(data['trend']['values']) == 7
+
+
+class TestAdminAnalyticsReport:
+    """Testes para /api/admin/analytics-report."""
+
+    def test_analytics_report_sem_token_retorna_401(self, client):
+        """Endpoint analítico sem autenticação deve rejeitar acesso."""
+        response = client.get('/api/admin/analytics-report')
+        assert response.status_code == 401
+
+    def test_analytics_report_com_token_valido_retorna_kpis(self, client):
+        """Endpoint analítico deve retornar KPIs, tendência e distribuição."""
+        fake_deposits = [
+            {'timestamp': 1700000000.0, 'ml_confidence': 0.9, 'weight_value': 2500},
+            {'timestamp': 1700003600.0, 'ml_confidence': 0.8, 'weight_value': 2600},
+        ]
+        fake_interactions = [
+            {'id': 1, 'deposit_id': 1, 'timestamp': 1700000000.0, 'resultado': 'sucesso'},
+            {'id': 2, 'deposit_id': None, 'timestamp': 1700000200.0, 'resultado': 'rejeitado'},
+            {'id': 3, 'deposit_id': 2, 'timestamp': 1700003600.0, 'resultado': 'sucesso'},
+        ]
+
+        with patch('app._ensure_db_connection') as mock_db_factory:
+            fake_db = MagicMock()
+            fake_db.get_all_deposits.return_value = fake_deposits
+            fake_db.get_all_interactions.return_value = fake_interactions
+
+            fake_context = MagicMock()
+            fake_context.__enter__.return_value = fake_db
+            fake_context.__exit__.return_value = None
+            mock_db_factory.return_value = fake_context
+
+            response = client.get(
+                '/api/admin/analytics-report',
+                headers={'Authorization': 'Bearer admin_token'}
+            )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert 'report' in data
+        assert 'kpis' in data['report']
+        assert data['report']['kpis']['total_interactions'] == 3
+        assert data['report']['kpis']['accepted_deposits'] == 2
 
 
 # =============================================================================

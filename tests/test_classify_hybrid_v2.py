@@ -33,7 +33,7 @@ def create_test_image_file(tmp_path, saturation: int = 100, size: int = 128) -> 
     hsv[:, :, 2] = 200  # Value
     bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-    image_path = tmp_path / "test_image.jpg"
+    image_path = tmp_path / f"test_image_{saturation}_{size}.jpg"
     cv2.imwrite(str(image_path), bgr)
     return image_path
 
