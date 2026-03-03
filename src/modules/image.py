@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 import traceback
 
@@ -11,6 +13,21 @@ import numpy as np  # pyright: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Seção 3 (ml-conventions): Thresholds de saturação — NÃO alterar sem documentar experimento
+# =============================================================================
+SAT_HIGH_THRESHOLD      = 120  # sat > 120 → SAT_HIGH
+SAT_MID_UPPER_THRESHOLD = 100  # sat > 100 → MID_HIGH_SAT / ACCEPT_MID_SAT
+SAT_DEBUG_MIN_THRESHOLD =  50  # sat > 50  → DEBUG_MODE ativo
+SAT_LOW_THRESHOLD       =  50  # sat < 50  → LOW_SAT_FORCE_TAMPINHA
+SAT_VERY_LOW_THRESHOLD  =  30  # sat < 30  → SAT_VERY_LOW (não-tampinha)
+
+# =============================================================================
+# Seção 6 (ml-conventions): Caminhos de modelo — constantes, nunca inline
+# =============================================================================
+MODEL_PATH  = Path('models/svm/svm_model_complete.pkl')
+SCALER_PATH = Path('models/svm/scaler_complete.pkl')
+
 
 class ImageClassifier:
     def __init__(self):
@@ -20,8 +37,8 @@ class ImageClassifier:
     def load_classifier(self):
 
         try:
-            model_path = Path('models/svm/svm_model_complete.pkl')
-            scaler_path = Path('models/svm/scaler_complete.pkl')
+            model_path = MODEL_PATH
+            scaler_path = SCALER_PATH
 
             if not model_path.exists() or not scaler_path.exists():
                 logger.error(f"❌ Arquivos do modelo não encontrados!")
@@ -46,17 +63,25 @@ class ImageClassifier:
             logger.debug(f"🔍 extract_color_features iniciada. Image type: {type(image)}, shape: {image.shape if hasattr(image, 'shape') else 'N/A'}")
             
             if not isinstance(image, np.ndarray):
-                logger.error(f"❌ Imagem não é numpy array! Tipo: {type(image)}")
+                logger.error(f"❌ Imagem não é ndarray! Tipo: {type(image)}")
                 return None
-                
+            if image.ndim != 3 or image.shape[2] != 3:
+                logger.error(f"❌ Shape inesperado: {image.shape} (esperado H×W×3 BGR)")
+                return None
+            if image.dtype != np.uint8:
+                logger.warning(f"⚠️ dtype={image.dtype}, convertendo para uint8")
+                image = image.astype(np.uint8)
+
             image = cv2.resize(image, (128, 128))
             logger.debug(f"✅ Imagem redimensionada para 128x128")
 
             # Extrair apenas 8 features para match com modelo
             features = []
 
+            # Split único — evita chamar cv2.split() múltiplas vezes
+            b_channel, g_channel, _ = cv2.split(image)
+
             # 1-3: Mean, Std, Median do canal B
-            b_channel = cv2.split(image)[0]
             features.extend([
                 np.mean(b_channel),
                 np.std(b_channel),
@@ -64,7 +89,6 @@ class ImageClassifier:
             ])
 
             # 4-6: Mean, Std, Median do canal G
-            g_channel = cv2.split(image)[1]
             features.extend([
                 np.mean(g_channel),
                 np.std(g_channel),
@@ -93,21 +117,15 @@ class ImageClassifier:
 
         try:
             logger.info(f"📸 Iniciando classificação. Imagem shape: {image.shape if image is not None else 'None'}")
-            
-            if not hasattr(cv2, 'cvtColor'):
-                logger.error("❌ ERRO CRÍTICO: cv2 módulo não está completo!")
-                return None, None, None, "ERRO"
-            
-            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-            saturation = np.mean(hsv[:, :, 1])
-            logger.info(f"✅ HSV convertido. Saturação: {saturation:.1f}")
 
+            # Features e saturação calculados em uma única passagem (sem conversão HSV dupla)
             features = self.extract_color_features(image)
             if features is None or np.isnan(features).any():
                 logger.error("❌ Erro ao extrair features")
-                return None, None, saturation, "ERRO"
-            
-            logger.info(f"✅ Features extraídas. Shape: {features.shape}")
+                return None, None, None, "ERRO"
+
+            saturation = float(features[6])  # features[6] = saturação média HSV
+            logger.info(f"✅ Features extraídas. Shape: {features.shape}, Saturação: {saturation:.1f}")
 
             features_scaled = self.scaler.transform([features])
 
@@ -118,26 +136,26 @@ class ImageClassifier:
             logger.info(f"🔍 SVM: pred={svm_pred}, conf={svm_conf:.2f}, prob={svm_prob:.2f}, sat={saturation:.1f}")
 
             # Em modo debug, aceitar tampinha com confiança alta
-            if is_debug_mode and saturation > 50:
+            if is_debug_mode and saturation > SAT_DEBUG_MIN_THRESHOLD:
                 logger.info("🐛 MODO DEBUG: Aceitando como tampinha")
                 return 1, 0.95, saturation, "DEBUG_MODE"
 
-            if saturation > 120:
+            if saturation > SAT_HIGH_THRESHOLD:
                 confidence = 0.95 if svm_pred == 1 else 0.90
                 return 1, confidence, saturation, "SAT_HIGH"
-            elif saturation < 30:
+            elif saturation < SAT_VERY_LOW_THRESHOLD:
                 confidence = 0.95
                 return 0, confidence, saturation, "SAT_VERY_LOW"
             else:
-                if saturation > 100:
+                if saturation > SAT_MID_UPPER_THRESHOLD:
                     if svm_pred == 1:
                         return 1, 0.75, saturation, "MID_HIGH_SAT"
                     else:
-                        return 1, 0.70, saturation, "ACCEPT_MID_SAT"  # Aceitar tampinhas com sat media
-                elif saturation < 50:
+                        return 1, 0.70, saturation, "ACCEPT_MID_SAT"
+                elif saturation < SAT_LOW_THRESHOLD:
                     return 1, 0.75, saturation, "LOW_SAT_FORCE_TAMPINHA"
                 else:
-                    # Saturação entre 50-100: aceitar como tampinha
+                    # Saturação entre SAT_LOW_THRESHOLD e SAT_MID_UPPER_THRESHOLD
                     return 1, 0.80, saturation, "NORMAL_SAT_TAMPINHA"
 
         except Exception as e:

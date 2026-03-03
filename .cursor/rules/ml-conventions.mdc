@@ -1,0 +1,258 @@
+---
+description: Convenções e invariantes do pipeline de Machine Learning do TOTEM IA
+globs: ["src/models_classifiers/**/*.py", "src/models_trainers/**/*.py", "src/modules/image.py"]
+alwaysApply: true
+---
+
+# 🤖 ML Conventions — TOTEM IA
+
+> **Atenção**: Existem dois extratores de features no projeto com vetores **diferentes**:
+> - `src/models_trainers/svm_complete_classifier.py` → **24 features** (RGB+HSV+Shape) — usado no treinamento offline
+> - `src/modules/image.py` → **8 features** (BGR-B, BGR-G, HSV-sat, contraste) — usado em produção
+>
+> O modelo `.pkl` em uso **deve** ter sido treinado com o mesmo vetor de produção (8 features).
+> Nunca usar o trainer de 24 features para gerar o modelo que vai para `models/svm/svm_model_complete.pkl`.
+
+## 1. Compatibilidade Python 3.9
+
+Todo arquivo de ML **deve** ter `from __future__ import annotations` como **primeira linha de código** (após shebang/docstring).
+Sem isso, type hints como `np.ndarray | None` quebram em runtime no Python 3.9 do ambiente de produção.
+
+```python
+# ✅ Obrigatório em todos os arquivos ML
+from __future__ import annotations
+
+import numpy as np
+...
+```
+
+---
+
+## 2. Contrato do Vetor de Features (8 dimensões — NÃO alterar sem retreinar)
+
+O modelo SVM treinado espera **exatamente 8 features** nesta ordem:
+
+| Índice | Feature              | Canal    |
+|--------|----------------------|----------|
+| 0      | Mean canal B         | BGR      |
+| 1      | Std canal B          | BGR      |
+| 2      | Median canal B       | BGR      |
+| 3      | Mean canal G         | BGR      |
+| 4      | Std canal G          | BGR      |
+| 5      | Median canal G       | BGR      |
+| **6**  | **Saturação média**  | **HSV**  |
+| 7      | Contraste geral      | Grayscale|
+
+### Regras críticas
+- **Nunca** adicionar ou remover features sem gerar novo `.pkl` treinado com o mesmo vetor
+- **`features[6]` é a saturação** — código que precisar de saturação lê esse índice, não recalcula HSV
+- Validar sempre com `assert features.shape == (8,)` em testes
+
+```python
+# ✅ Correto: ler saturação do vetor já calculado
+saturation = float(features[6])
+
+# ❌ Errado: recalcular HSV depois de já ter extraído features
+hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+saturation = np.mean(hsv[:, :, 1])  # conversão desnecessária
+```
+
+---
+
+## 3. Thresholds de Saturação — Usar Constantes, Nunca Magic Numbers
+
+Todos os limiares de decisão vivem em `src/modules/image.py` como constantes de módulo:
+
+```python
+# ✅ Definir como constantes no topo do módulo
+SAT_HIGH_THRESHOLD      = 120   # sat > 120  → SAT_HIGH
+SAT_MID_UPPER_THRESHOLD = 100   # sat > 100  → MID_HIGH_SAT
+SAT_DEBUG_MIN_THRESHOLD =  50   # sat > 50   → DEBUG_MODE ativo
+SAT_LOW_THRESHOLD       =  50   # sat < 50   → LOW_SAT_FORCE_TAMPINHA
+SAT_VERY_LOW_THRESHOLD  =  30   # sat < 30   → SAT_VERY_LOW (não-tampinha)
+```
+
+```python
+# ❌ Proibido: magic numbers nas condições
+if saturation > 120:     # o que é 120?
+if saturation < 30:      # o que é 30?
+```
+
+---
+
+## 4. Assinatura Canônica de Classificação
+
+Todo método de classificação deve seguir exatamente esta assinatura e semântica de retorno:
+
+```python
+def classify_image(
+    self,
+    image: np.ndarray | None,
+    is_debug_mode: bool = False
+) -> tuple[int | None, float | None, float | None, str]:
+    """
+    Returns:
+        (prediction, confidence, saturation, method)
+        prediction:  1=tampinha | 0=não-tampinha | None=erro
+        confidence:  0.0–1.0 | None=erro
+        saturation:  valor HSV médio (float) | None=erro
+        method:      identificador do caminho de decisão (ver tabela abaixo)
+    """
+```
+
+### Métodos de decisão válidos
+
+| `method`                  | Condição                                     |
+|---------------------------|----------------------------------------------|
+| `"SAT_HIGH"`              | `saturation > SAT_HIGH_THRESHOLD`            |
+| `"SAT_VERY_LOW"`          | `saturation < SAT_VERY_LOW_THRESHOLD`        |
+| `"MID_HIGH_SAT"`          | `sat > SAT_MID_UPPER` e `SVM pred == 1`      |
+| `"ACCEPT_MID_SAT"`        | `sat > SAT_MID_UPPER` e `SVM pred == 0`      |
+| `"NORMAL_SAT_TAMPINHA"`   | `SAT_LOW ≤ sat ≤ SAT_MID_UPPER`             |
+| `"LOW_SAT_FORCE_TAMPINHA"`| `SAT_VERY_LOW ≤ sat < SAT_LOW`              |
+| `"DEBUG_MODE"`            | `is_debug_mode=True` e `sat > SAT_DEBUG_MIN` |
+| `"ERRO"`                  | qualquer falha interna                       |
+
+**Nunca inventar novos métodos sem documentar nesta tabela.**
+
+---
+
+## 5. Conversões de Color Space — Uma Vez Só
+
+```python
+# ✅ Uma única chamada cv2.split()
+b_channel, g_channel, _ = cv2.split(image)
+
+# ❌ Proibido: múltiplas chamadas cv2.split() na mesma imagem
+b_channel = cv2.split(image)[0]
+g_channel = cv2.split(image)[1]   # segunda chamada desnecessária
+```
+
+```python
+# ✅ Reutilizar resultado já calculado
+features = self.extract_color_features(image)
+saturation = float(features[6])   # HSV já foi calculado dentro
+
+# ❌ Proibido: chamar cvtColor depois de extract_color_features
+features = self.extract_color_features(image)
+hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)   # redundante
+saturation = np.mean(hsv[:, :, 1])
+```
+
+---
+
+## 6. Caminhos de Modelo — Constantes, Nunca Hardcoded Inline
+
+```python
+# ✅ Definir como constantes (Path) no topo do arquivo
+MODEL_PATH  = Path('models/svm/svm_model_complete.pkl')
+SCALER_PATH = Path('models/svm/scaler_complete.pkl')
+
+# ❌ Proibido: string literal dispersa no código
+model = joblib.load('models/svm/svm_model_complete.pkl')
+```
+
+---
+
+## 7. Separação Treino × Inferência
+
+- Arquivos em `src/models_trainers/` → **somente treinamento** (lêem de disco, salvam `.pkl`)
+- Arquivos em `src/models_classifiers/` → **somente inferência offline/análise**
+- `src/modules/image.py` → **inferência em produção** (chamado pelo Flask)
+- `src/models_trainers/` **nunca** é importado por `app.py` nem por `src/modules/`
+
+```python
+# ❌ Proibido em app.py ou src/modules/
+from src.models_trainers.svm_complete_classifier import SVMTrainer
+```
+
+---
+
+## 8. Retorno de Erro Padronizado
+
+Em qualquer falha dentro de `classify_image`, retornar sempre a tupla completa de 4 elementos:
+
+```python
+# ✅ Correto
+return None, None, None, "ERRO"
+
+# ❌ Proibido: tuple incompleta ou levantar exceção
+return None, None       # quebra desempacotamento no caller
+raise ValueError(...)   # não tratado pelo caller
+```
+
+---
+
+## 9. Validação de Input de Imagem (Antes de Processar)
+
+Validar shape, dtype e número de canais antes de qualquer operação OpenCV:
+
+```python
+# ✅ Validação completa no início de extract_color_features
+if not isinstance(image, np.ndarray):
+    logger.error(f"❌ Imagem não é ndarray: {type(image)}")
+    return None
+if image.ndim != 3 or image.shape[2] != 3:
+    logger.error(f"❌ Shape inesperado: {image.shape} (esperado H×W×3)")
+    return None
+if image.dtype != np.uint8:
+    logger.warning(f"⚠️ dtype={image.dtype}, convertendo para uint8")
+    image = image.astype(np.uint8)
+```
+
+- **dtype obrigatório**: `uint8` (valores 0–255) — OpenCV opera incorretamente com float32/float64
+- **shape obrigatório**: `(H, W, 3)` — 3 canais BGR; rejeitar grayscale e RGBA
+
+---
+
+## 10. Scaler — `.transform()` Somente na Inferência (Nunca `.fit()`)
+
+Chamar `.fit()` ou `.fit_transform()` no `scaler` durante a inferência causa **data leakage** e silenciosamente produz predições erradas.
+
+```python
+# ✅ Inferência: apenas .transform()
+features_scaled = self.scaler.transform([features])
+
+# ❌ PROIBIDO em qualquer código chamado pelo Flask
+self.scaler.fit(features)             # vaza dados de produção para o modelo
+self.scaler.fit_transform([features]) # idem
+```
+
+- `scaler.fit()` e `scaler.fit_transform()` são exclusivos de `src/models_trainers/`
+- O scaler em produção deve ser o **mesmo objeto serializado** (`scaler_complete.pkl`) gerado no treinamento
+
+---
+
+## 11. Paridade Treino–Inferência (Training-Serving Skew)
+
+O pré-processamento na inferência deve ser **bit-a-bit idêntico** ao do treinamento:
+
+| Etapa               | Treino                        | Inferência (produção)          |
+|---------------------|-------------------------------|--------------------------------|
+| Leitura             | `cv2.imread()` (do disco)     | `cv2.imdecode()` (dos bytes)   |
+| Resize              | `(128, 128)`                  | `(128, 128)` ← **deve bater**  |
+| Extração de features| vetor de N dimensões          | vetor de **mesmo N**           |
+| Normalização        | `scaler.fit_transform(X)`     | `scaler.transform([x])`        |
+
+Qualquer divergência nessa cadeia produz predições sistematicamente erradas **sem gerar erro**.
+
+```python
+# ❌ Exemplo de skew silencioso — treino resize (256,256), inferência resize (128,128)
+# O modelo nunca falha, mas as predições são ruins
+```
+
+---
+
+## 12. Valores de Confiança São Heurísticos (Não Calibrados)
+
+Os valores fixos de `confidence` no código (`0.95`, `0.90`, `0.80`, `0.75`, `0.70`) são **empiricamente definidos**, não resultam de calibração probabilística (Platt Scaling / Isotonic Regression).
+
+```python
+# ⚠️ Estes valores são heurísticos — não alterar sem novo experimento documentado
+if saturation > SAT_HIGH_THRESHOLD:
+    confidence = 0.95 if svm_pred == 1 else 0.90  # ajustado com ~20 imagens de teste
+```
+
+- **Nunca alterar esses valores** sem registrar o experimento (imagens usadas, métricas obtidas)
+- Se implementar calibração real, usar `sklearn.calibration.CalibratedClassifierCV` e persistir o modelo calibrado
+- Documentar qualquer mudança no commit com métricas de precision/recall
