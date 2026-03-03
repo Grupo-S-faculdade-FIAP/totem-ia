@@ -73,9 +73,64 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
 ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
 ESP32_HEALTH_TIMEOUT_SECONDS = 20.0
 ESP32_LOCAL_TIMEOUT_SECONDS = 20.0
+TOTEM_ACCESS_USERNAME = 'aluno'
+TOTEM_ACCESS_PASSWORD = 'fiap2026'
 
 image_classifier: ImageClassifier | None = None
 db_connection: DatabaseConnection | None = None
+
+PROTECTED_TOTEM_PATHS = {
+    '/',
+    '/totem_intro.html',
+    '/totem_v2.html',
+    '/processing',
+    '/finalization',
+    '/rewards',
+    '/esp32_simulator.html',
+    '/test',
+}
+
+
+def _requires_totem_auth(path: str) -> bool:
+    """Define se a rota atual deve exigir autenticação básica."""
+    if path.startswith('/api/'):
+        return False
+    if path.startswith('/static/'):
+        return False
+    if path.startswith('/admin'):
+        return False
+    return path in PROTECTED_TOTEM_PATHS
+
+
+def _is_valid_basic_auth(auth_header: str) -> bool:
+    """Valida header Authorization no formato Basic base64(user:password)."""
+    if not auth_header or not auth_header.startswith('Basic '):
+        return False
+    token = auth_header.split(' ', 1)[1].strip()
+    try:
+        decoded = base64.b64decode(token).decode('utf-8')
+        username, password = decoded.split(':', 1)
+        return username == TOTEM_ACCESS_USERNAME and password == TOTEM_ACCESS_PASSWORD
+    except Exception:
+        return False
+
+
+@app.before_request
+def enforce_totem_basic_auth():
+    """Aplica senha básica para páginas do totem via popup nativo do navegador."""
+    if not _requires_totem_auth(request.path):
+        return None
+    auth_header = request.headers.get('Authorization', '')
+    if _is_valid_basic_auth(auth_header):
+        return None
+    response = jsonify({
+        'status': 'erro',
+        'error': 'Autenticação necessária',
+        'timestamp': datetime.now().isoformat()
+    })
+    response.status_code = 401
+    response.headers['WWW-Authenticate'] = 'Basic realm="Totem IA"'
+    return response
 
 # Rota para servir imagem de teste (para simulador ESP32)
 @app.route('/test_tampinha.jpg')

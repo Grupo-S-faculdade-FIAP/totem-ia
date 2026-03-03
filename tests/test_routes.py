@@ -507,45 +507,87 @@ class TestSpeechRoutes:
 class TestPageRoutes:
     """Testes para rotas de páginas HTML."""
 
+    @staticmethod
+    def _totem_headers() -> dict[str, str]:
+        credentials = base64.b64encode(b"aluno:fiap2026").decode('utf-8')
+        return {'Authorization': f'Basic {credentials}'}
+
     def test_index_retorna_200(self, client):
         """GET / deve retornar 200."""
-        response = client.get('/')
+        response = client.get('/', headers=self._totem_headers())
         assert response.status_code == 200
 
     def test_totem_intro_retorna_html(self, client):
         """GET /totem_intro.html retorna HTML."""
-        response = client.get('/totem_intro.html')
+        response = client.get('/totem_intro.html', headers=self._totem_headers())
         assert response.status_code == 200
 
     def test_totem_v2_retorna_html(self, client):
         """GET /totem_v2.html retorna HTML."""
-        response = client.get('/totem_v2.html')
+        response = client.get('/totem_v2.html', headers=self._totem_headers())
         assert response.status_code == 200
 
     def test_processing_retorna_html(self, client):
         """GET /processing retorna HTML."""
-        response = client.get('/processing')
+        response = client.get('/processing', headers=self._totem_headers())
         assert response.status_code == 200
 
     def test_finalization_retorna_html(self, client):
         """GET /finalization retorna HTML."""
-        response = client.get('/finalization')
+        response = client.get('/finalization', headers=self._totem_headers())
         assert response.status_code == 200
 
     def test_rewards_retorna_html(self, client):
         """GET /rewards retorna HTML."""
-        response = client.get('/rewards')
+        response = client.get('/rewards', headers=self._totem_headers())
         assert response.status_code == 200
 
     def test_test_page_retorna_html(self, client):
         """GET /test retorna página de teste."""
-        response = client.get('/test')
+        response = client.get('/test', headers=self._totem_headers())
         assert response.status_code == 200
 
     def test_esp32_simulator_retorna_html(self, client):
         """GET /esp32_simulator.html retorna simulador."""
-        response = client.get('/esp32_simulator.html')
+        response = client.get('/esp32_simulator.html', headers=self._totem_headers())
         assert response.status_code == 200
+
+
+# =============================================================================
+# TestTotemBasicAuth
+# =============================================================================
+
+class TestTotemBasicAuth:
+    """Testes da proteção por Basic Auth nas páginas do totem."""
+
+    def test_home_exige_basic_auth_quando_senha_ativa(self, client):
+        """Com senha ativa, GET / sem Authorization deve retornar 401."""
+        response = client.get('/')
+
+        assert response.status_code == 401
+        assert 'WWW-Authenticate' in response.headers
+        assert 'Basic' in response.headers['WWW-Authenticate']
+
+    def test_home_autoriza_com_basic_auth_valido(self, client):
+        """Com senha ativa, Basic Auth correto deve liberar acesso."""
+        credentials = base64.b64encode(b"aluno:fiap2026").decode('utf-8')
+        response = client.get('/', headers={'Authorization': f'Basic {credentials}'})
+
+        assert response.status_code == 200
+
+    def test_home_rejeita_basic_auth_invalido(self, client):
+        """Com senha ativa, Basic Auth com senha errada deve negar acesso."""
+        credentials = base64.b64encode(b"aluno:senha_errada").decode('utf-8')
+        response = client.get('/', headers={'Authorization': f'Basic {credentials}'})
+
+        assert response.status_code == 401
+
+    def test_home_rejeita_basic_auth_usuario_invalido(self, client):
+        """Com senha correta e usuário errado, deve negar acesso."""
+        credentials = base64.b64encode(b"outro:fiap2026").decode('utf-8')
+        response = client.get('/', headers={'Authorization': f'Basic {credentials}'})
+
+        assert response.status_code == 401
 
 
 # =============================================================================
