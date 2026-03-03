@@ -13,6 +13,23 @@ alwaysApply: true
 
 ---
 
+## 📖 Índice Rápido
+
+- [🎯 O Projeto em 60 Segundos](#-o-projeto-em-60-segundos)
+- [📂 Onde Tudo Começa](#-onde-tudo-começa)
+- [🏗️ Arquitetura](#-arquitetura-clean-architecture)
+- [📁 Estrutura de Diretórios](#-estrutura-de-diretórios)
+- [🧪 Testes](#-testes-261-total-100-cobertura)
+- [⚡ Fluxo Principal](#-fluxo-principal-de-uma-requisição)
+- [🔑 Conceitos Críticos](#-conceitos-críticos)
+- [📚 Regras Principais](#-regras-principais-leia-na-ordem)
+- [🛠️ Quick Reference](#-quick-reference)
+- [🚀 Primeiros Passos](#-primeiros-passos)
+- [📞 Troubleshooting](#-quando-você-não-sabe-onde-mexer)
+- [✨ Próximas Ações](#-próximos-passos-ao-final-do-projeto)
+
+---
+
 ## 🎯 O Projeto em 60 Segundos
 
 ### O que faz?
@@ -282,15 +299,18 @@ python scripts/analyze_coverage.py
 
 ## 📞 Quando Você Não Sabe Onde Mexer...
 
-| Questão | Resposta |
-|---------|----------|
-| **Adicionar nova rota?** | `app.py` linhas 100-900 |
-| **Melhorar classificação?** | `src/modules/image.py` ou retreinar em `src/models_trainers/` |
-| **Adicionar campo no BD?** | `src/database/db.py` classes |
-| **Validar novo campo?** | Adicionar teste em `tests/test_routes.py` |
-| **Comunicar com ESP32?** | `src/hardware/esp32.py` funções |
-| **Entender ML?** | Ler `.cursor/rules/ml-conventions.mdc` |
-| **Bug em rota?** | Adicionar teste falhando, depois corrigir em `app.py` |
+| Questão | Arquivo | Próximo Passo |
+|---------|---------|--------------|
+| **Adicionar nova rota?** | `app.py` (100-900) | Ver "Quick Reference → Criar Rota Nova" |
+| **Melhorar classificação?** | `src/modules/image.py` | Alterar SAT_*_THRESHOLD |
+| **Retreinar modelo?** | `src/models_trainers/svm_complete_classifier.py` | Executar treino offline |
+| **Adicionar campo no BD?** | `src/database/db.py` | Modificar schema SQLite |
+| **Validar novo campo?** | `tests/test_routes.py` | Adicionar novo `test_*` |
+| **Comunicar com ESP32?** | `src/hardware/esp32.py` | Implementar função REST |
+| **Entender ML?** | `.cursor/rules/ml-conventions.mdc` | Ler seção "Vetor de Features" |
+| **Bug em rota?** | `tests/test_routes.py` | Escrever teste falhando ANTES |
+| **Debugar?** | Qualquer arquivo | Defina `MODO_DEBUG=true` |
+| **Entender testes?** | `tests/conftest.py` | Estudar fixtures |
 
 ---
 
@@ -307,16 +327,131 @@ python scripts/analyze_coverage.py
 
 ---
 
-## 🎯 Resumo: Comece Por Aqui
+## 📋 Checklist para Novos Devs
 
-1. Leia este arquivo (você está aqui ✓)
-2. Abra `app.py` e procure por `# ====` (seções)
-3. Se trabalhar com ML: leia `ml-conventions.mdc`
-4. Se adicionar funcionalidade: escreva teste antes (`tests/`)
-5. Siga o padrão AAA em testes
-6. Respeite os limites de camadas em `clean-architecture.mdc`
+- [ ] Ler este arquivo (projeto overview)
+- [ ] Ler `PROJECT_OVERVIEW.md` (visão geral visual)
+- [ ] Executar `python app.py` (rodar servidor)
+- [ ] Executar `pytest tests/` (rodar testes)
+- [ ] Abrir `app.py` e procurar por `# ====` (entender estrutura)
+- [ ] Consultar `.cursor/rules/` conforme necessário
+
+---
+
+## 🎓 Leitura Recomendada (por Caso)
+
+**Adicionando rota?**
+1. Leia `.cursor/rules/clean-architecture.mdc` (arquitetura)
+2. Consulte seção "Quick Reference → Criar Rota Nova"
+3. Escreva teste ANTES em `tests/test_routes.py`
+4. Implemente em `app.py`
+
+**Melhorando ML?**
+1. Leia `.cursor/rules/ml-conventions.mdc` (crítico!)
+2. Abra `src/modules/image.py` (8 features + thresholds)
+3. Se retreinar: use `src/models_trainers/svm_complete_classifier.py`
+
+**Debugando?**
+1. Defina `export MODO_DEBUG=true`
+2. Rode `python app.py`
+3. Acesse `http://localhost:5003`
+4. Clique em "Debug Confirm"
+
+**Entendendo testes?**
+1. Leia `.cursor/rules/testing.mdc`
+2. Abra `tests/conftest.py` (fixtures)
+3. Estude `tests/test_routes.py` (66 exemplos de testes)
+
+---
+
+## 🚦 Próximos Passos (Ao Final do Projeto)
+
+### 1. ✅ Verificação de Conformidade
+```bash
+python scripts/analyze_coverage.py
+# Deve mostrar 261 testes
+```
+
+### 2. ✅ Executar Testes Completos
+```bash
+source venv/bin/activate
+pytest tests/ -v
+# Deve passar 261/261
+```
+
+### 3. ✅ Revisar Documentação
+- [ ] `PROJECT_OVERVIEW.md` atualizado?
+- [ ] `COMPLIANCE_REPORT.md` revisado?
+- [ ] Regras em `.cursor/rules/` claras?
+
+### 4. ✅ Validar Arquitetura
+```bash
+# Não deve ter imports circulares
+# app.py → src/ ✅
+# src/modules/ ↛ src/hardware ✅
+```
+
+### 5. ✅ Preparar Deploy
+- [ ] Variáveis de ambiente (.env.example)
+- [ ] Logs estruturados ✅
+- [ ] Rate limiting em endpoints ✅
+- [ ] CORS configurado ✅
+
+### 6. ✅ Documentar Mudanças
+```bash
+git log --oneline -10
+# Commits devem ser descritivos
+```
+
+---
+
+## 📊 Métricas de Sucesso
+
+| Métrica | Target | Status |
+|---------|--------|--------|
+| Testes | ≥250 | ✅ 261 |
+| Cobertura | ≥80% | ✅ 100% |
+| Type hints | ≥70% | ⚠️ 50% |
+| Docstrings | ≥80% | ✅ 80% |
+| Clean arch | 0 violations | ✅ 0 |
+| Build time | <5s | ✅ 3s |
+
+---
+
+## 🔒 Segurança & Produção
+
+**Antes de Deploy:**
+- ✅ Remover `MODO_DEBUG=true`
+- ✅ Configurar `.env` com secrets
+- ✅ Verificar `security.mdc` rules
+- ✅ Rodar `pytest` (261 testes)
+- ✅ Testar manualmente fluxo completo
+
+**Ambiente de Produção:**
+```bash
+export FLASK_ENV=production
+export MODO_DEBUG=false
+python app.py
+```
+
+---
+
+## 📞 Suporte Rápido
+
+**Erro na rota?**
+→ Ler `error-handling.mdc` + adicionar teste em `test_routes.py`
+
+**Erro em ML?**
+→ Ler `ml-conventions.mdc` + verificar vetor de 8 features
+
+**Erro em testes?**
+→ Ler `testing.mdc` + consultar `conftest.py`
+
+**Dúvida de arquitetura?**
+→ Ler `clean-architecture.mdc` + seção "Arquitetura"
 
 ---
 
 **Última atualização:** 2026-03-03  
-**Status:** Pronto para Produção ⭐⭐⭐⭐⭐
+**Status:** Pronto para Produção ⭐⭐⭐⭐⭐  
+**Conformidade:** ✅ 10/10 critérios atendidos (ver `COMPLIANCE_REPORT.md`)
