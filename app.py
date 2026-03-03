@@ -71,6 +71,8 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
 
 # Configuração ESP32 LOCAL (para fallback)
 ESP32_IP = os.getenv('ESP32_IP', '192.168.1.101')  # IP do ESP32 na rede local
+ESP32_HEALTH_TIMEOUT_SECONDS = 20.0
+ESP32_LOCAL_TIMEOUT_SECONDS = 20.0
 
 image_classifier: ImageClassifier | None = None
 db_connection: DatabaseConnection | None = None
@@ -496,7 +498,7 @@ def esp32_health():
     try:
         response = requests.get(
             f"{ESP32_API_URL}/api/health",
-            timeout=5
+            timeout=ESP32_HEALTH_TIMEOUT_SECONDS
         )
         
         if response.status_code == 200:
@@ -592,7 +594,7 @@ def validate_mechanical():
             esp32_response = requests.post(
                 f'http://{ESP32_IP}/check_mechanical',
                 json={'validation': 'OK'},
-                timeout=5
+                timeout=ESP32_LOCAL_TIMEOUT_SECONDS
             )
             
             esp32_data = esp32_response.json()

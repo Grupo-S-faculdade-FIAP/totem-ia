@@ -56,7 +56,7 @@ def get_esp32_jwt_token() -> str | None:
                 "device_id": device_key,
                 "device_key": device_key
             },
-            timeout=15
+            timeout=30
         )
         
         logger.info(f"📡 ESP32 LOGIN RESPONSE: {login_response.status_code}")
@@ -100,9 +100,9 @@ def call_esp32_api(endpoint: str, method: str = 'GET', data: dict | None = None)
     
     try:
         if method == 'GET':
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=25)
         elif method == 'POST':
-            response = requests.post(url, json=data, headers=headers, timeout=10)
+            response = requests.post(url, json=data, headers=headers, timeout=25)
         else:
             logger.error(f"❌ Método HTTP não suportado: {method}")
             return None
