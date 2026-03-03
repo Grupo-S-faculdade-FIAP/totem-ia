@@ -1,89 +1,75 @@
 ---
-description: Regras para escrita de testes unitários e de integração
+description: Estratégia de testes com foco em alto nível e regressão
 globs: ["test_*.py", "tests/**/*.py"]
 alwaysApply: false
 ---
 
-# 🧪 Testes — TOTEM IA
+# 🧪 Testes — TOTEM IA (Qualidade Exemplar)
 
-## Framework e Estrutura
+## Objetivo
 
-- Usar **pytest** como framework de testes
-- Arquivos de teste: `test_<modulo>.py` na raiz ou `tests/` 
-- Classes de teste: `TestNomeDoModulo`
-- Funções de teste: `test_<comportamento_esperado>`
+- Garantir testes confiáveis, legíveis e com alto poder de detectar regressão real
+- Priorizar comportamento observável e contrato da aplicação
+- Manter equilíbrio entre unitário, integração e fluxo completo conforme risco
 
-## Organização dos Testes
+## Pirâmide de Testes (alvo do projeto)
 
-```
-test_classify.py          → Testes do ImageClassifier
-test_database.py          → Testes do DatabaseConnection
-test_esp32.py             → Testes de integração ESP32
-test_routes.py            → Testes das rotas Flask
-test_debug_mode.py        → Testes do modo debug
-```
+- **20% Unitários**: lógica isolada, caminhos de erro e edge cases
+- **50% Integração**: rotas Flask + banco em memória + ESP32 mockado
+- **30% E2E/Fluxo**: jornada completa da API com estado realista
+- Toda feature nova deve nascer com pelo menos 1 teste de integração ou fluxo completo
 
-## Padrão AAA (Arrange-Act-Assert)
+## Estrutura e Nomeação
 
-```python
-def test_classify_image_returns_tampinha_for_high_saturation():
-    # Arrange
-    classifier = ImageClassifier()
-    classifier.model = mock_model
-    classifier.scaler = mock_scaler
-    image = create_test_image(saturation=150)
+- Arquivos em `tests/` com foco por domínio: `test_routes.py`, `test_database.py`, `test_esp32_*.py`
+- Cenários de fluxo completo em `tests/test_integration_*.py` ou `tests/integration/test_*.py`
+- Nome do teste descreve comportamento observável, não implementação interna
+- Padrão AAA obrigatório (Arrange, Act, Assert)
 
-    # Act
-    pred, conf, sat, method = classifier.classify_image(image)
+## Regras para Testes de Alto Nível
 
-    # Assert
-    assert pred == 1
-    assert conf >= 0.90
-    assert method == "SAT_HIGH"
-```
+1. Cobrir fluxos críticos:
+   - classificação válida com persistência
+   - classificação inválida sem persistência
+   - fallback quando ESP32 está offline
+   - erro de entrada (JSON, imagem, arquivo) com resposta padronizada
+2. Validar contrato HTTP completo:
+   - `status_code`, campos obrigatórios, tipos e semântica dos dados
+   - formato de erro padronizado (`status`, `error`, `timestamp`)
+3. Verificar efeitos colaterais:
+   - escrita no banco quando aplicável
+   - ausência de escrita quando fluxo falha
+4. Evitar acoplamento frágil:
+   - não testar mensagens de log
+   - não afirmar chamada interna específica quando o contrato externo é suficiente
 
-## Mocking
+## Mocking, Fakes e Infra de Teste
 
-- **Mockar** dependências externas: ESP32, OpenAI, banco de dados
-- Usar `unittest.mock.patch` ou `pytest-mock`
-- **Nunca** chamar APIs reais em testes unitários
-- Criar fixtures reutilizáveis para imagens, modelos e conexões
+- Não chamar rede real (ESP32, OpenAI) em CI
+- ESP32 deve ser simulado por mock/fake determinístico
+- Banco para integração deve ser SQLite temporário (`tmp_path` ou `:memory:`)
+- Fixtures devem ser pequenas, reutilizáveis e sem estado compartilhado entre testes
 
-```python
-@pytest.fixture
-def mock_classifier():
-    classifier = ImageClassifier()
-    classifier.model = MagicMock()
-    classifier.scaler = MagicMock()
-    return classifier
+## Cobertura de Decisão (ML + API)
 
-@pytest.fixture
-def sample_image():
-    return np.zeros((128, 128, 3), dtype=np.uint8)
-```
+- Cobrir todos os métodos de decisão aceitos em `classify_image`:
+  `SAT_HIGH`, `SAT_VERY_LOW`, `MID_HIGH_SAT`, `ACCEPT_MID_SAT`,
+  `NORMAL_SAT_TAMPINHA`, `LOW_SAT_FORCE_TAMPINHA`, `DEBUG_MODE`, `ERRO`
+- Cada caminho crítico deve ter ao menos:
+  - 1 teste de unidade (decisão isolada)
+  - 1 teste de integração (resposta da rota)
 
-## Cobertura Mínima
+## Qualidade do Teste
 
-- Testar **todos** os caminhos de classificação (SAT_HIGH, SAT_VERY_LOW, MID_HIGH_SAT, etc.)
-- Testar cenários de erro (imagem None, modelo não carregado, ESP32 offline)
-- Testar validação de input nas rotas (JSON inválido, arquivo muito grande, extensão errada)
+- Teste deve validar comportamento observável e risco real de regressão
+- Um teste deve ter uma causa principal de falha (evitar "mega teste")
+- Não duplicar cenários já cobertos por outro teste com mesma intenção
+- Usar parametrização (`pytest.mark.parametrize`) para matrizes de input-output
+- Um teste exemplar deve atingir 8/10 na rubrica: valor, clareza, robustez, determinismo e diagnóstico
 
-## Testes de Integração
+## O que Evitar
 
-- Prefixar com `test_integration_` ou colocar em pasta `tests/integration/`
-- Usar `app.test_client()` do Flask para testar rotas
-- Usar banco SQLite em memória (`:memory:`) para testes de DB
-
-```python
-@pytest.fixture
-def client():
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
-```
-
-## O que NÃO Testar
-
-- Não testar código de terceiros (Flask, OpenCV, sklearn)
-- Não testar getters/setters triviais
-- Não testar configurações estáticas (constantes, enums)
+- Testes dependentes de ordem de execução
+- Uso de `sleep`/tempo real para sincronização
+- Assert em detalhes internos frágeis (nome de variável, número exato de chamadas sem necessidade)
+- Cobertura artificial de linhas sem validar regra de negócio

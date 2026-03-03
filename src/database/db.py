@@ -166,4 +166,34 @@ class DatabaseConnection:
             return []
 
 
+    def get_all_interactions(self) -> list[dict]:
+        """Retorna todas as interações registradas, da mais recente para a mais antiga."""
+        try:
+            if not self.conn:
+                self.__connect()
+            if not self.conn:
+                raise Exception("Conexão com o banco de dados não estabelecida.")
+
+            c = self.conn.cursor()
+            c.execute(
+                '''SELECT id, deposit_id, timestamp, resultado
+                   FROM interactions
+                   ORDER BY timestamp DESC'''
+            )
+            rows = c.fetchall()
+            interactions = [
+                {
+                    'id': row[0],
+                    'deposit_id': row[1],
+                    'timestamp': row[2],
+                    'resultado': row[3]
+                }
+                for row in rows
+            ]
+            logger.info(f"ℹ️ Recuperadas {len(interactions)} interações do banco")
+            return interactions
+        except Exception as e:
+            logger.error(f"❌ Erro ao buscar interações: {e}", exc_info=True)
+            return []
+
 

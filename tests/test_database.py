@@ -174,3 +174,35 @@ class TestGetAllDeposits:
             db.save_deposit_data(0.90, True, True, 2500, 0.5)
             deposits = db.get_all_deposits()
         assert campos_esperados.issubset(set(deposits[0].keys()))
+
+
+# =============================================================================
+# TestGetAllInteractions
+# =============================================================================
+
+class TestGetAllInteractions:
+    def test_banco_vazio_retorna_lista_vazia(self, test_db: DatabaseConnection):
+        """get_all_interactions em banco vazio deve retornar lista vazia."""
+        with test_db as db:
+            interactions = db.get_all_interactions()
+        assert interactions == []
+
+    def test_retorna_interacoes_com_campos_esperados(self, test_db: DatabaseConnection):
+        """Interações devem conter id, deposit_id, timestamp e resultado."""
+        with test_db as db:
+            deposit_id = db.save_deposit_data(0.95, True, True, 2500, 0.5)
+            db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO, deposit_id)
+            interactions = db.get_all_interactions()
+
+        assert len(interactions) == 1
+        interaction = interactions[0]
+        assert {'id', 'deposit_id', 'timestamp', 'resultado'}.issubset(set(interaction.keys()))
+        assert interaction['resultado'] == DatabaseConnection.ResultadoInteracao.SUCESSO.value
+
+    def test_get_all_interactions_retorna_vazio_em_erro_conexao(self, test_db: DatabaseConnection):
+        """Erro de conexão interna deve resultar em lista vazia sem levantar exceção."""
+        test_db.conn = None
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(test_db, '_DatabaseConnection__connect', lambda: (_ for _ in ()).throw(Exception("erro")))
+            interactions = test_db.get_all_interactions()
+        assert interactions == []

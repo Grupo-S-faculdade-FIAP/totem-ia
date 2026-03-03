@@ -1,159 +1,100 @@
 ---
-description: Skill para escrever testes unitários e de integração com pytest
+description: Skill para escrever testes com qualidade exemplar, alta confiabilidade e baixo acoplamento
 globs: ["test_*.py", "tests/**/*.py"]
 alwaysApply: false
 ---
-
-# 🧪 Skill: Escrevendo Testes — TOTEM IA
+# 🧪 Skill: Testes com Qualidade Exemplar — TOTEM IA
 
 ## Quando Usar
-Ao criar novos testes ou adicionar cobertura a módulos existentes.
+Ao criar ou revisar testes que precisam ser confiáveis, legíveis e difíceis de quebrar por mudanças internas.
 
-## Setup do Test Client Flask
+## Princípios de Qualidade (obrigatórios)
+
+- **Valor real:** cada teste cobre um risco de regressão relevante
+- **Determinismo:** mesmo resultado em qualquer máquina/horário
+- **Clareza:** intenção explícita no nome e nos asserts
+- **Baixo acoplamento:** validar contrato/comportamento, não detalhes internos
+- **Diagnóstico rápido:** quando falha, a causa é fácil de identificar
+
+## Rubrica de Excelência (0-2 por item)
+
+Pontue o teste antes de finalizar. Meta: **>= 8/10**.
+
+1. Escopo único (uma causa principal de falha)
+2. Arrange mínimo e expressivo (sem setup desnecessário)
+3. Assert sem ambiguidade (campos críticos e semântica)
+4. Independência (sem depender de ordem/estado global)
+5. Robustez (não quebra por refactor interno legítimo)
+
+## Receita 1 — Estrutura AAA limpa
 
 ```python
 import pytest
-from unittest.mock import MagicMock, patch
-from app import app
+from unittest.mock import patch
 
 @pytest.fixture
 def client():
-    """Client Flask para testes de rotas."""
     app.config['TESTING'] = True
     with app.test_client() as client:
         yield client
-```
 
-## Testar Rota de Classificação
-
-```python
-import base64
-import numpy as np
-import cv2
-
-def create_test_image(width=128, height=128, color=(0, 128, 255)):
-    """Cria imagem de teste com cor específica."""
-    image = np.full((height, width, 3), color, dtype=np.uint8)
-    _, buffer = cv2.imencode('.jpg', image)
-    return base64.b64encode(buffer).decode('utf-8')
-
-def test_classify_returns_success_for_valid_image(client):
-    """Testar que /api/classify aceita imagem base64 válida."""
-    image_b64 = create_test_image(color=(0, 200, 255))  # Alta saturação
-    
+def test_classify_retornar_sucesso_quando_imagem_valida(client, valid_image_b64):
+    # Arrange
     with patch('app.image_classifier') as mock_clf:
         mock_clf.classify_image.return_value = (1, 0.95, 150.0, "SAT_HIGH")
-        
-        response = client.post('/api/classify', json={
-            'image': f'data:image/jpeg;base64,{image_b64}'
-        })
-    
+
+        # Act
+        response = client.post('/api/classify', json={'image': valid_image_b64})
+
+    # Assert
     assert response.status_code == 200
     data = response.get_json()
     assert data['status'] == 'sucesso'
     assert data['is_tampinha'] is True
+    assert 'timestamp' in data
+```
 
-def test_classify_returns_error_without_image(client):
-    """Testar que /api/classify rejeita request sem imagem."""
+## Receita 2 — Validar contrato de erro (não só status code)
+
+```python
+def test_classify_retornar_erro_padrao_sem_imagem(client):
     response = client.post('/api/classify', json={})
+
     assert response.status_code == 400
+    data = response.get_json()
+    assert data['status'] == 'erro'
+    assert isinstance(data.get('error'), str)
+    assert 'timestamp' in data
 ```
 
-## Testar ImageClassifier
+## Receita 3 — Parametrizar cenários sem duplicação
 
 ```python
-from src.modules.image import ImageClassifier
-
-@pytest.fixture
-def classifier():
-    clf = ImageClassifier()
-    clf.model = MagicMock()
-    clf.scaler = MagicMock()
-    clf.model.predict.return_value = [1]
-    clf.model.decision_function.return_value = [2.5]
-    clf.scaler.transform.return_value = [[0.5] * 8]
-    return clf
-
-def test_classify_high_saturation_returns_tampinha(classifier):
-    """Saturação > 120 deve retornar TAMPINHA."""
-    # Criar imagem com alta saturação (cor viva)
-    image = np.full((128, 128, 3), (0, 200, 255), dtype=np.uint8)
-    
-    pred, conf, sat, method = classifier.classify_image(image)
-    
-    assert pred == 1
-    assert conf >= 0.90
-    assert method == "SAT_HIGH"
-
-def test_classify_none_image_returns_error(classifier):
-    """Imagem None deve retornar erro."""
-    pred, conf, sat, method = classifier.classify_image(None)
-    
-    assert pred is None
-    assert method == "ERRO"
+@pytest.mark.parametrize(
+    "sat,esperado",
+    [
+        (150.0, "SAT_HIGH"),
+        (20.0, "SAT_VERY_LOW"),
+        (80.0, "NORMAL_SAT_TAMPINHA"),
+    ],
+)
+def test_metodo_classificacao_por_faixa_saturacao(classifier, sat, esperado):
+    classifier.extract_color_features = MagicMock(return_value=np.array([0,0,0,0,0,0,sat,0], dtype=float))
+    pred, conf, saturation, method = classifier.classify_image(np.zeros((128, 128, 3), dtype=np.uint8))
+    assert method == esperado
 ```
 
-## Testar DatabaseConnection
+## Anti-Patterns (evitar sempre)
 
-```python
-from src.database.db import DatabaseConnection
+- Teste que só replica implementação interna
+- Teste com `sleep` para “esperar funcionar”
+- Assert genérico (`assert response`) sem validar campos críticos
+- Mock em excesso que transforma integração em pseudo-unitário
 
-@pytest.fixture
-def test_db(tmp_path):
-    """Banco de dados temporário para testes."""
-    db_path = str(tmp_path / "test.db")
-    db = DatabaseConnection(db_path)
-    db.init_db()
-    return db
+## Definição de pronto para um teste novo
 
-def test_save_deposit_returns_id(test_db):
-    with test_db as db:
-        deposit_id = db.save_deposit_data(0.95, True, True, 2500, 0.5)
-    assert deposit_id is not None
-    assert isinstance(deposit_id, int)
-
-def test_save_interaction_succeeds(test_db):
-    with test_db as db:
-        db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO)
-    # Não deve levantar exceção
-```
-
-## Testar ESP32 (Mockado)
-
-```python
-from src.hardware.esp32 import get_esp32_sensors, check_esp32_mechanical
-
-@patch('src.hardware.esp32.call_esp32_api')
-def test_get_sensors_returns_data(mock_api):
-    mock_api.return_value = {'presenca': True, 'peso': 2600, 'temperatura': 25}
-    
-    result = get_esp32_sensors()
-    
-    assert result is not None
-    assert result['presenca'] is True
-    assert result['peso'] == 2600
-
-@patch('src.hardware.esp32.call_esp32_api')
-def test_get_sensors_returns_none_when_offline(mock_api):
-    mock_api.return_value = None
-    
-    result = get_esp32_sensors()
-    
-    assert result is None
-```
-
-## Executar Testes
-
-```bash
-# Todos os testes
-pytest -v
-
-# Com cobertura
-pytest --cov=src --cov-report=term-missing
-
-# Apenas um arquivo
-pytest test_classify.py -v
-
-# Apenas testes que contêm "database"
-pytest -k "database" -v
-```
+- [ ] Nome descreve comportamento observável
+- [ ] Cobre risco real de regressão
+- [ ] Falha com mensagem diagnóstica clara
+- [ ] Não depende de ordem, relógio ou rede real
+- [ ] Rubrica >= 8/10

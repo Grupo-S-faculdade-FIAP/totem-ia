@@ -6,7 +6,7 @@ Link apresentação: https://youtu.be/LTQljfnJWdM
 
 **Turma:** Desenvolvimento de Soluções IoT com IA  
 **Grupo:** Grupo-S-faculdade-FIAP  
-**Sprint:** 1 - Proposta Técnica e Arquitetura Inicial MVP
+**Sprint:** 3 - Integração Funcional e Analytics do Protótipo
 
 
 ## 👥 *Integrantes do Grupo*
@@ -49,7 +49,7 @@ Desenvolvemos uma solução inovadora de **totem inteligente para depósito de t
 
 ---
 
-## 🎯 Objetivos da Sprint 1
+## 🎯 Objetivos Consolidados da Sprint 3
 
 ### Objetivos Principais
 
@@ -247,25 +247,25 @@ plantuml totem_ia_diagram.puml
 - **Database**: Modelagem e otimização
 - **Testing**: QA e validação
 
-### Cronograma Previsto
+### Cronograma Consolidado
 
-#### Sprint 1 (Atual) ✅
+#### Sprint 1 (Concluída) ✅
 - [x] Definição de arquitetura
 - [x] Prototipagem do modelo IA
 - [x] Interface básica
 - [x] Documentação inicial
 
-#### Sprint 2 (Próxima)
-- [ ] Integração hardware
-- [ ] Otimização do modelo
-- [ ] Dashboard analytics
-- [ ] Testes de usabilidade
+#### Sprint 2 (Concluída) ✅
+- [x] Integração inicial de hardware
+- [x] Evolução do modelo
+- [x] Dashboard analytics inicial
+- [x] Validação de usabilidade
 
-#### Sprint 3 (Final)
-- [ ] Deployment produção
-- [ ] Testes de stress
-- [ ] Documentação completa
-- [ ] Apresentação final
+#### Sprint 3 (Entrega Atual) ✅
+- [x] Integração fim a fim (sensor → banco → análise → visualização)
+- [x] Relatórios analíticos e KPIs consolidados
+- [x] Validações e testes de integração principais
+- [x] Material de apresentação da solução
 
 ---
 
