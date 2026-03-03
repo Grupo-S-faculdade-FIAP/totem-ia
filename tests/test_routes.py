@@ -319,6 +319,22 @@ class TestAdminRoutes:
             data = response.get_json()
             assert 'token' in data or 'message' in data
 
+    def test_api_admin_login_retorna_admin_token_do_ambiente(self, client):
+        """Login válido deve retornar o token definido em ADMIN_TOKEN."""
+        with patch.dict('os.environ', {
+            'ADMIN_USERNAME': 'admin',
+            'ADMIN_PASSWORD': 'senha123',
+            'ADMIN_TOKEN': 'token_customizado_123'
+        }):
+            response = client.post('/api/admin/login', json={
+                'username': 'admin',
+                'password': 'senha123'
+            })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['token'] == 'token_customizado_123'
+
     def test_api_admin_dashboard_sem_autenticacao(self, client):
         """Dashboard sem autenticação → 401 ou 403."""
         response = client.get('/api/admin/dashboard')

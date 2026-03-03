@@ -6,6 +6,7 @@ Cobre:
     get_total_interacoes, get_all_deposits
 """
 import pytest
+from unittest.mock import patch
 
 from src.database.db import DatabaseConnection
 
@@ -205,4 +206,44 @@ class TestGetAllInteractions:
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(test_db, '_DatabaseConnection__connect', lambda: (_ for _ in ()).throw(Exception("erro")))
             interactions = test_db.get_all_interactions()
+        assert interactions == []
+
+
+class TestDatabaseErrorBranches:
+    """Cobre ramos de erro para aumentar robustez da camada de persistência."""
+
+    def test_init_db_trata_falha_na_conexao(self, tmp_path):
+        db = DatabaseConnection(str(tmp_path / "db_fail_init.db"))
+        with patch('src.database.db.sqlite3.connect', side_effect=Exception("erro_conexao")):
+            db.init_db()
+        assert db.conn is None
+
+    def test_save_deposit_data_retorna_none_em_falha_conexao(self, tmp_path):
+        db = DatabaseConnection(str(tmp_path / "db_fail_save_deposit.db"))
+        with patch('src.database.db.sqlite3.connect', side_effect=Exception("erro_conexao")):
+            deposit_id = db.save_deposit_data(0.9, True, True, 2000, 0.5)
+        assert deposit_id is None
+
+    def test_save_interaction_trata_falha_conexao(self, tmp_path):
+        db = DatabaseConnection(str(tmp_path / "db_fail_save_interaction.db"))
+        with patch('src.database.db.sqlite3.connect', side_effect=Exception("erro_conexao")):
+            db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO)
+        assert db.conn is None
+
+    def test_get_total_interacoes_retorna_zero_em_falha_conexao(self, tmp_path):
+        db = DatabaseConnection(str(tmp_path / "db_fail_total.db"))
+        with patch('src.database.db.sqlite3.connect', side_effect=Exception("erro_conexao")):
+            total = db.get_total_interacoes()
+        assert total == 0
+
+    def test_get_all_deposits_retorna_vazio_em_falha_conexao(self, tmp_path):
+        db = DatabaseConnection(str(tmp_path / "db_fail_deposits.db"))
+        with patch('src.database.db.sqlite3.connect', side_effect=Exception("erro_conexao")):
+            deposits = db.get_all_deposits()
+        assert deposits == []
+
+    def test_get_all_interactions_retorna_vazio_em_falha_conexao(self, tmp_path):
+        db = DatabaseConnection(str(tmp_path / "db_fail_interactions.db"))
+        with patch('src.database.db.sqlite3.connect', side_effect=Exception("erro_conexao")):
+            interactions = db.get_all_interactions()
         assert interactions == []
