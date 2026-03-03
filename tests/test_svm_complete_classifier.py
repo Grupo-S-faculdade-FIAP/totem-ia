@@ -181,12 +181,14 @@ class TestSVMScalerFitting:
 class TestSVMModelSerialization:
     """Testes de serialização do modelo."""
 
-    def test_modelo_pkl_pode_ser_carregado(self):
+    def test_modelo_pkl_pode_ser_carregado(self, tmp_path):
         """Modelo salvo em pkl deve poder ser carregado."""
         from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
         import joblib
         
         clf = SVMCompleteDatasetClassifier()
+        clf.model_path = tmp_path / "models"
+        clf.model_path.mkdir(parents=True, exist_ok=True)
         
         X = np.random.randn(50, 24)
         y = np.random.randint(0, 2, 50)
@@ -201,12 +203,14 @@ class TestSVMModelSerialization:
         assert loaded_model is not None
         assert hasattr(loaded_model, 'predict')
 
-    def test_scaler_pkl_pode_ser_carregado(self):
+    def test_scaler_pkl_pode_ser_carregado(self, tmp_path):
         """Scaler salvo em pkl deve poder ser carregado."""
         from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
         import joblib
         
         clf = SVMCompleteDatasetClassifier()
+        clf.model_path = tmp_path / "models"
+        clf.model_path.mkdir(parents=True, exist_ok=True)
         
         X = np.random.randn(50, 24)
         y = np.random.randint(0, 2, 50)
@@ -221,12 +225,14 @@ class TestSVMModelSerialization:
         assert loaded_scaler is not None
         assert hasattr(loaded_scaler, 'transform')
 
-    def test_modelo_carregado_faz_predicoes_iguais(self):
+    def test_modelo_carregado_faz_predicoes_iguais(self, tmp_path):
         """Modelo carregado deve fazer mesmas predições."""
         from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
         import joblib
         
         clf1 = SVMCompleteDatasetClassifier()
+        clf1.model_path = tmp_path / "models"
+        clf1.model_path.mkdir(parents=True, exist_ok=True)
         
         X = np.random.randn(50, 24)
         y = np.random.randint(0, 2, 50)
@@ -311,12 +317,14 @@ class TestSVMDatasetLoading:
 class TestSVMIntegrationComplete:
     """Testes de integração completa do SVM."""
 
-    def test_pipeline_completo_treino_predicao(self):
+    def test_pipeline_completo_treino_predicao(self, tmp_path):
         """Pipeline completo: load → train → save → load → predict."""
         from src.models_trainers.svm_complete_classifier import SVMCompleteDatasetClassifier
         import joblib
         
         clf = SVMCompleteDatasetClassifier()
+        clf.model_path = tmp_path / "models"
+        clf.model_path.mkdir(parents=True, exist_ok=True)
         
         # Usar dados sintéticos
         X = np.random.randn(100, 24)
