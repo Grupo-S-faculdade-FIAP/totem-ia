@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 # Importar agents e prompts
 # from prompts.agents_config import get_agent
 
-from src.modules.image import ImageClassifier
+from src.modules.image import ImageClassifier, SAT_LOW_THRESHOLD, SAT_VERY_LOW_THRESHOLD
 from src.modules.sprint3_analytics import build_analytics_report, build_daily_trend, is_admin_authenticated
 
 from src.hardware.esp32 import ESP32_API_URL, get_esp32_sensors, calculate_environmental_impact, check_esp32_mechanical, confirm_esp32_detection
@@ -426,7 +426,12 @@ def api_validate_complete():
             }), 500
 
         is_tampinha = pred == 1
-        if not is_tampinha:
+        borderline_low_sat = (
+            not is_tampinha
+            and sat is not None
+            and SAT_VERY_LOW_THRESHOLD <= float(sat) < SAT_LOW_THRESHOLD
+        )
+        if not is_tampinha and not borderline_low_sat:
             if db_connection:
                 with db_connection as db:
                     db.save_interaction(DatabaseConnection.ResultadoInteracao.REJEITADO)
@@ -443,6 +448,12 @@ def api_validate_complete():
                 'confidence': float(conf) if conf is not None else None,
                 'timestamp': datetime.now().isoformat()
             }), 200
+
+        if borderline_low_sat:
+            logger.warning(
+                "⚠️ Classificação limítrofe em baixa saturação; prosseguindo para validação mecânica "
+                f"(sat={sat:.1f}, conf={conf:.2f})"
+            )
 
         logger.info(f"✅ Classificação OK: TAMPINHA (conf: {conf:.2f})")
 
