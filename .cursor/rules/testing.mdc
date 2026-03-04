@@ -43,6 +43,14 @@ alwaysApply: false
    - não testar mensagens de log
    - não afirmar chamada interna específica quando o contrato externo é suficiente
 
+## Gate obrigatório do classificador
+
+- Sempre que houver mudança em `src/modules/image.py` ou `src/models_trainers/svm_8features_trainer.py`, executar obrigatoriamente:
+  1. `python3 -m pytest -q tests/test_classify.py tests/test_model_artifacts.py`
+  2. `RUN_E2E=1 python3 -m pytest -q tests/e2e/test_smoke_playwright.py`
+  3. `RUN_E2E=1 python3 -m pytest -q`
+- Só retornar o trabalho como concluído com todas as etapas acima verdes.
+
 ## Mocking, Fakes e Infra de Teste
 
 - Não chamar rede real (ESP32, OpenAI) em CI

@@ -21,6 +21,8 @@ SAT_MID_UPPER_THRESHOLD = 100  # sat > 100 → MID_HIGH_SAT / ACCEPT_MID_SAT
 SAT_DEBUG_MIN_THRESHOLD =  50  # sat > 50  → DEBUG_MODE ativo
 SAT_LOW_THRESHOLD       =  50  # sat < 50  → LOW_SAT_FORCE_TAMPINHA
 SAT_VERY_LOW_THRESHOLD  =  30  # sat < 30  → SAT_VERY_LOW (não-tampinha)
+SVM_MIN_MARGIN          =  1.20  # |decision_function| mínimo para evitar falso positivo em zona ambígua
+SVM_MIN_MARGIN_HIGH_SAT =  1.20  # margem mínima para aceitar mesmo em SAT_HIGH
 
 # =============================================================================
 # Seção 6 (ml-conventions): Caminhos de modelo — constantes, nunca inline
@@ -132,8 +134,12 @@ class ImageClassifier:
             svm_pred = self.model.predict(features_scaled)[0]
             svm_conf = self.model.decision_function(features_scaled)[0]
             svm_prob = 1 / (1 + np.exp(-svm_conf))
+            svm_margin = abs(float(svm_conf))
 
-            logger.info(f"🔍 SVM: pred={svm_pred}, conf={svm_conf:.2f}, prob={svm_prob:.2f}, sat={saturation:.1f}")
+            logger.info(
+                f"🔍 SVM: pred={svm_pred}, conf={svm_conf:.2f}, prob={svm_prob:.2f}, "
+                f"margin={svm_margin:.2f}, sat={saturation:.1f}"
+            )
 
             # Em modo debug, aceitar tampinha com confiança alta
             if is_debug_mode and saturation > SAT_DEBUG_MIN_THRESHOLD:
@@ -141,22 +147,30 @@ class ImageClassifier:
                 return 1, 0.95, saturation, "DEBUG_MODE"
 
             if saturation > SAT_HIGH_THRESHOLD:
-                confidence = 0.95 if svm_pred == 1 else 0.90
-                return 1, confidence, saturation, "SAT_HIGH"
+                # Alta saturação não pode mais aceitar automaticamente: exige margem forte do SVM
+                if svm_pred == 1 and svm_margin >= SVM_MIN_MARGIN_HIGH_SAT:
+                    return 1, 0.95, saturation, "SAT_HIGH"
+                return 0, 0.90, saturation, "SAT_HIGH"
             elif saturation < SAT_VERY_LOW_THRESHOLD:
                 confidence = 0.95
                 return 0, confidence, saturation, "SAT_VERY_LOW"
             else:
                 if saturation > SAT_MID_UPPER_THRESHOLD:
-                    if svm_pred == 1:
+                    # Zona intermediária alta: não aceitar automaticamente quando o SVM rejeita
+                    if svm_pred == 1 and svm_margin >= SVM_MIN_MARGIN:
                         return 1, 0.75, saturation, "MID_HIGH_SAT"
                     else:
-                        return 1, 0.70, saturation, "ACCEPT_MID_SAT"
+                        return 0, 0.70, saturation, "ACCEPT_MID_SAT"
                 elif saturation < SAT_LOW_THRESHOLD:
-                    return 1, 0.75, saturation, "LOW_SAT_FORCE_TAMPINHA"
+                    # Faixa de baixa saturação não força aceitação
+                    if svm_pred == 1 and svm_margin >= SVM_MIN_MARGIN:
+                        return 1, 0.75, saturation, "LOW_SAT_FORCE_TAMPINHA"
+                    return 0, 0.75, saturation, "LOW_SAT_FORCE_TAMPINHA"
                 else:
-                    # Saturação entre SAT_LOW_THRESHOLD e SAT_MID_UPPER_THRESHOLD
-                    return 1, 0.80, saturation, "NORMAL_SAT_TAMPINHA"
+                    # Saturação média: depende de decisão do SVM + margem mínima
+                    if svm_pred == 1 and svm_margin >= SVM_MIN_MARGIN:
+                        return 1, 0.80, saturation, "NORMAL_SAT_TAMPINHA"
+                    return 0, 0.80, saturation, "NORMAL_SAT_TAMPINHA"
 
         except Exception as e:
             logger.error(f"Erro na classificação: {e}")

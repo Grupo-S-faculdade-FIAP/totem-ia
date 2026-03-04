@@ -10,6 +10,12 @@ import pytest
 pytestmark = pytest.mark.e2e
 
 
+def _totem_basic_auth_headers() -> dict[str, str]:
+    """Retorna header Basic Auth para páginas protegidas do totem."""
+    token = base64.b64encode(b"aluno:fiap2026").decode("utf-8")
+    return {"Authorization": f"Basic {token}"}
+
+
 def _load_test_image_base64() -> str:
     image_path = Path("test_tampinha.jpg")
     assert image_path.exists(), "Imagem de teste não encontrada: test_tampinha.jpg"
@@ -41,13 +47,14 @@ def _admin_login(page, app_server: str, username: str = "admin", password: str =
 )
 def test_public_pages_available(page, app_server, route):
     """Páginas públicas/base devem responder com conteúdo HTML."""
-    response = page.request.get(f"{app_server}{route}")
+    response = page.request.get(f"{app_server}{route}", headers=_totem_basic_auth_headers())
     assert response.ok
     assert "text/html" in response.headers.get("content-type", "")
 
 
 def test_home_page_loads(page, app_server):
     """Smoke test: home deve carregar e conter contexto do totem."""
+    page.context.set_extra_http_headers(_totem_basic_auth_headers())
     page.goto(f"{app_server}/", wait_until="domcontentloaded")
 
     title = page.title()

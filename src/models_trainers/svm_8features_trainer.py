@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import cv2
 import joblib
 import numpy as np
-from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.metrics import confusion_matrix, precision_score, recall_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from tqdm import tqdm
@@ -24,6 +26,12 @@ POSITIVE_DIRS = [
     Path("datasets/color-cap/train/images"),
     Path("datasets/color-cap/valid/images"),
     Path("src/tampinhas"),
+]
+
+NEGATIVE_DIRS = [
+    Path("datasets/non-cap/train/images"),
+    Path("datasets/non-cap/valid/images"),
+    Path("datasets/negatives"),
 ]
 
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
@@ -74,6 +82,27 @@ def load_positive_features() -> list[np.ndarray]:
     return positive_features
 
 
+def load_negative_features() -> list[np.ndarray]:
+    """Carrega features negativas reais a partir das pastas configuradas."""
+    negative_features: list[np.ndarray] = []
+
+    for directory in NEGATIVE_DIRS:
+        if not directory.exists():
+            logger.warning(f"⚠️ Pasta negativa não encontrada: {directory}")
+            continue
+
+        files = sorted([p for p in directory.iterdir() if p.is_file() and p.suffix.lower() in VALID_EXTENSIONS])
+        logger.info(f"📂 Lendo negativos de {directory} ({len(files)} arquivos)")
+
+        for file in tqdm(files, desc=f"Negativos {directory.name}", leave=False):
+            image = cv2.imread(str(file))
+            features = extract_8_features(image)
+            if features is not None and not np.isnan(features).any():
+                negative_features.append(features)
+
+    return negative_features
+
+
 def generate_synthetic_negative_features(num_samples: int) -> list[np.ndarray]:
     """Gera negativos sintéticos em 8 features para balancear o treino."""
     negatives: list[np.ndarray] = []
@@ -102,7 +131,18 @@ def train_and_save() -> None:
     if not positives:
         raise RuntimeError("Nenhum dado positivo encontrado para treino.")
 
-    negatives = generate_synthetic_negative_features(len(positives))
+    negatives = load_negative_features()
+    use_synthetic_negatives = os.getenv("USE_SYNTHETIC_NEGATIVES", "0") == "1"
+    if not negatives and use_synthetic_negatives:
+        logger.warning("⚠️ Nenhum negativo real encontrado. Usando negativos sintéticos por fallback explícito.")
+        negatives = generate_synthetic_negative_features(len(positives))
+    elif not negatives:
+        raise RuntimeError(
+            "Nenhum dado negativo real encontrado. "
+            "Adicione imagens em datasets/non-cap/* ou datasets/negatives "
+            "ou rode com USE_SYNTHETIC_NEGATIVES=1 para fallback temporário."
+        )
+
     if not negatives:
         raise RuntimeError("Falha ao gerar dados negativos sintéticos.")
 
@@ -113,7 +153,15 @@ def train_and_save() -> None:
     logger.info(f"📏 Shape de features: {x.shape}")
 
     scaler = StandardScaler()
-    x_scaled = scaler.fit_transform(x)
+    x_train, x_val, y_train, y_val = train_test_split(
+        x,
+        y,
+        test_size=0.20,
+        random_state=42,
+        stratify=y,
+    )
+    x_train_scaled = scaler.fit_transform(x_train)
+    x_val_scaled = scaler.transform(x_val)
 
     model = SVC(
         kernel="rbf",
@@ -123,11 +171,22 @@ def train_and_save() -> None:
         probability=False,
         random_state=42,
     )
-    model.fit(x_scaled, y)
+    model.fit(x_train_scaled, y_train)
+
+    y_val_pred = model.predict(x_val_scaled)
+    precision = precision_score(y_val, y_val_pred, pos_label=1, zero_division=0)
+    recall = recall_score(y_val, y_val_pred, pos_label=1, zero_division=0)
+    cm = confusion_matrix(y_val, y_val_pred, labels=[0, 1])
+    logger.info(f"📊 Validação holdout | precision_tampinha={precision:.4f} recall_tampinha={recall:.4f}")
+    logger.info(f"📊 Matriz de confusão [linhas=real 0/1, colunas=pred 0/1]: {cm.tolist()}")
+
+    # Refit final com dataset completo para persistência do artefato
+    x_scaled_full = scaler.fit_transform(x)
+    model.fit(x_scaled_full, y)
 
     cv_scores = cross_val_score(
         model,
-        x_scaled,
+        x_scaled_full,
         y,
         cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=42),
         scoring="accuracy",

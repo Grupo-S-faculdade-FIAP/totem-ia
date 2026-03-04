@@ -113,3 +113,64 @@ def test_classify_image_method_matches_saturation_buckets(
         assert method == "LOW_SAT_FORCE_TAMPINHA"
     else:
         assert method == "NORMAL_SAT_TAMPINHA"
+
+
+@settings(max_examples=50, deadline=None)
+@given(saturation=st.integers(min_value=30, max_value=255))
+def test_classify_rejects_when_margin_is_low_even_with_positive_pred(
+    saturation: int
+) -> None:
+    """
+    Em faixas >= 30, predição positiva com margem baixa deve rejeitar.
+    Isso evita falsos positivos por confiança fraca do SVM.
+    """
+    classifier = ImageClassifier()
+    classifier.model = MagicMock()
+    classifier.scaler = MagicMock()
+    classifier.model.predict.return_value = [1]
+    classifier.model.decision_function.return_value = [0.10]  # margem baixa
+    classifier.scaler.transform.return_value = np.array([[0.1] * 8], dtype=np.float64)
+
+    image = _solid_bgr_from_saturation(saturation)
+    pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=False)
+
+    assert pred == 0
+    assert conf is not None and 0.0 <= conf <= 1.0
+    assert sat is not None and isinstance(sat, float)
+    assert method in {
+        "SAT_HIGH",
+        "SAT_VERY_LOW",
+        "ACCEPT_MID_SAT",
+        "LOW_SAT_FORCE_TAMPINHA",
+        "NORMAL_SAT_TAMPINHA",
+    }
+
+
+@settings(max_examples=50, deadline=None)
+@given(saturation=st.integers(min_value=30, max_value=255))
+def test_classify_accepts_when_margin_is_high_and_pred_positive(
+    saturation: int
+) -> None:
+    """
+    Para sat >= 30, predição positiva com margem alta deve aceitar.
+    Garante consistência das regras de aceitação por confiança.
+    """
+    classifier = ImageClassifier()
+    classifier.model = MagicMock()
+    classifier.scaler = MagicMock()
+    classifier.model.predict.return_value = [1]
+    classifier.model.decision_function.return_value = [2.50]  # margem alta
+    classifier.scaler.transform.return_value = np.array([[0.1] * 8], dtype=np.float64)
+
+    image = _solid_bgr_from_saturation(saturation)
+    pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=False)
+
+    assert pred == 1
+    assert conf is not None and 0.0 <= conf <= 1.0
+    assert sat is not None and isinstance(sat, float)
+    assert method in {
+        "SAT_HIGH",
+        "MID_HIGH_SAT",
+        "LOW_SAT_FORCE_TAMPINHA",
+        "NORMAL_SAT_TAMPINHA",
+    }
