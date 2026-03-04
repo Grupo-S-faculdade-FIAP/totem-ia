@@ -177,6 +177,20 @@ class TestValidateMechanicalUncoveredBranches:
 
 
 class TestValidateCompleteUncoveredBranches:
+    def test_validate_complete_inicializa_classifier_quando_none(self, client):
+        img_bytes = _img_bytes()
+        payload = {"image": f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"}
+        fake_classifier = MagicMock()
+        fake_classifier.classify_image.return_value = (1, 0.95, 120.0, "SAT_HIGH")
+
+        with patch("app.image_classifier", None), patch("app.ImageClassifier", return_value=fake_classifier), patch(
+            "app.check_esp32_mechanical", return_value={"ok": True}
+        ), patch("app.confirm_esp32_detection"), patch("app.db_connection", None):
+            response = client.post("/api/validate-complete", json=payload)
+
+        assert response.status_code == 200
+        fake_classifier.load_classifier.assert_called_once()
+
     def test_validate_complete_upload_filename_vazio(self, client):
         payload = {"file": (io.BytesIO(b""), "")}
         response = client.post("/api/validate-complete", data=payload, content_type="multipart/form-data")

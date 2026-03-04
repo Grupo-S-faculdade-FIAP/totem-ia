@@ -227,6 +227,7 @@ def serve_debug_image(filename):
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
     try:
+        classifier = _ensure_image_classifier()
         image = None
 
         if request.is_json:
@@ -266,7 +267,7 @@ def api_classify():
         if image is None:
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
-        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if image_classifier else (None, None, None, None)
+        pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if classifier else (None, None, None, None)
 
         if pred is None:
             return jsonify({
@@ -377,6 +378,7 @@ def api_validate_complete():
     3. Retorna resultado
     """
     try:
+        classifier = _ensure_image_classifier()
         image = None
 
         # Processar imagem igual ao /api/classify
@@ -408,7 +410,7 @@ def api_validate_complete():
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
         # ========== ETAPA 1: Classificação Software ==========
-        pred, conf, sat, method = image_classifier.classify_image(image) if image_classifier else (None, None, None, None)
+        pred, conf, sat, method = classifier.classify_image(image) if classifier else (None, None, None, None)
         
         if pred is None:
             if db_connection:
@@ -584,6 +586,7 @@ def esp32_health():
 def validate_mechanical():
     """Validação completa: Software (ML) + Mecânica (ESP32)"""
     try:
+        classifier = _ensure_image_classifier()
         # 1. Receber imagem
         if 'image' not in request.files:
             return jsonify({
@@ -610,7 +613,7 @@ def validate_mechanical():
             }), 400
         
         # 3. Classificar com SVM
-        pred, conf, sat, method = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if image_classifier else (None, None, None, None)
+        pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if classifier else (None, None, None, None)
         
         if pred is None:
             if db_connection:
@@ -951,6 +954,7 @@ def api_debug_confirm():
 def api_save_deposit():
     """Salva depósito manual com classificação para testes e integração."""
     try:
+        classifier = _ensure_image_classifier()
         if not request.is_json:
             return jsonify({
                 'status': 'erro',
@@ -978,7 +982,7 @@ def api_save_deposit():
                 'timestamp': datetime.now().isoformat()
             }), 400
 
-        pred, conf, _, _ = image_classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if image_classifier else (None, None, None, None)
+        pred, conf, _, _ = classifier.classify_image(image, is_debug_mode=MODO_DEBUG) if classifier else (None, None, None, None)
         if pred != 1:
             return jsonify({
                 'status': 'rejeitado',
@@ -1016,6 +1020,15 @@ def _ensure_db_connection() -> DatabaseConnection:
         db_connection = DatabaseConnection()
         db_connection.init_db()
     return db_connection
+
+
+def _ensure_image_classifier() -> ImageClassifier | None:
+    """Garante classificador carregado para uso nas rotas."""
+    global image_classifier
+    if image_classifier is None:
+        image_classifier = ImageClassifier()
+        image_classifier.load_classifier()
+    return image_classifier
 
 
 @app.route('/api/admin/dashboard', methods=['GET'])
