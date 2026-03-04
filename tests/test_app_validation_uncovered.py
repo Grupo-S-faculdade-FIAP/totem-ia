@@ -233,6 +233,19 @@ class TestValidateCompleteUncoveredBranches:
         assert response.status_code == 200
         assert fake_db.save_interaction.called
 
+    def test_validate_complete_nao_tampinha_limite_baixa_sat_prossegue_fluxo(self, client):
+        img_bytes = _img_bytes()
+        payload = {"file": (io.BytesIO(img_bytes), "ok.jpg")}
+        with patch("app.image_classifier") as mock_clf, patch("app.check_esp32_mechanical", return_value={"ok": True}), patch(
+            "app.confirm_esp32_detection"
+        ), patch("app.db_connection", None):
+            # pred=0, mas sat limítrofe (>=30 e <50) deve prosseguir para validação mecânica
+            mock_clf.classify_image.return_value = (0, 0.75, 40.0, "LOW_SAT_FORCE_TAMPINHA")
+            response = client.post("/api/validate-complete", data=payload, content_type="multipart/form-data")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["status"] == "sucesso"
+
     def test_validate_complete_erro_esp32_com_db_contexto(self, client):
         img_bytes = _img_bytes()
         payload = {"image": f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"}
