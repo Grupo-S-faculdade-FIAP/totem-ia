@@ -15,6 +15,7 @@ Ao criar ou revisar testes que precisam ser confiáveis, legíveis e difíceis d
 - **Clareza:** intenção explícita no nome e nos asserts
 - **Baixo acoplamento:** validar contrato/comportamento, não detalhes internos
 - **Diagnóstico rápido:** quando falha, a causa é fácil de identificar
+- **Gate do classificador:** ao mexer em `src/modules/image.py` ou treino SVM, sempre rodar validação completa antes de retornar ao usuário
 
 ## Rubrica de Excelência (0-2 por item)
 
@@ -98,3 +99,4 @@ def test_metodo_classificacao_por_faixa_saturacao(classifier, sat, esperado):
 - [ ] Falha com mensagem diagnóstica clara
 - [ ] Não depende de ordem, relógio ou rede real
 - [ ] Rubrica >= 8/10
+- [ ] Se houve mudança no classificador, suíte completa executada (`RUN_E2E=1 python3 -m pytest -q`)
