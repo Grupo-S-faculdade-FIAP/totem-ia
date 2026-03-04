@@ -130,6 +130,25 @@ class TestClassifyImage:
         _, _, sat, _ = classifier.classify_image(image)
         assert isinstance(sat, float)
 
+    def test_sat_high_pred_positivo_com_margem_baixa_rejeita(self, classifier: ImageClassifier):
+        """Mesmo com sat alta, margem baixa não deve aceitar tampinha."""
+        classifier.model.predict.return_value = [1]
+        classifier.model.decision_function.return_value = [0.20]
+        image = create_image_with_saturation(180)
+        pred, conf, _, method = classifier.classify_image(image)
+        assert pred == 0
+        assert conf == 0.90
+        assert method == "SAT_HIGH"
+
+    def test_sat_high_com_svm_rejeitando_nao_forca_tampinha(self, classifier: ImageClassifier):
+        """Saturação alta não deve forçar aceitação quando SVM rejeita."""
+        classifier.model.predict.return_value = [0]
+        image = create_image_with_saturation(180)
+        pred, conf, _, method = classifier.classify_image(image)
+        assert pred == 0
+        assert conf == 0.90
+        assert method == "SAT_HIGH"
+
     # ── SAT_VERY_LOW ──────────────────────────────────────────────────────
 
     def test_sat_very_low_retorna_nao_tampinha(self, classifier: ImageClassifier):
@@ -150,12 +169,22 @@ class TestClassifyImage:
         assert pred == 1
         assert method == "MID_HIGH_SAT"
 
-    def test_mid_high_sat_svm_rejeita_aceita_mesmo_assim(self, classifier: ImageClassifier):
-        """100 < sat ≤ 120, SVM pred=0 → ACCEPT_MID_SAT (aceita tampinha mesmo assim)."""
+    def test_mid_high_sat_svm_rejeita_nao_aceita(self, classifier: ImageClassifier):
+        """100 < sat ≤ 120, SVM pred=0 deve rejeitar para evitar falso positivo."""
         classifier.model.predict.return_value = [0]
         image = create_image_with_saturation(110)
         pred, conf, sat, method = classifier.classify_image(image)
-        assert pred == 1
+        assert pred == 0
+        assert method == "ACCEPT_MID_SAT"
+        assert conf == 0.70
+
+    def test_mid_high_sat_pred_positivo_com_margem_baixa_rejeita(self, classifier: ImageClassifier):
+        """Predição positiva com margem baixa deve cair na zona de incerteza (rejeitar)."""
+        classifier.model.predict.return_value = [1]
+        classifier.model.decision_function.return_value = [0.05]
+        image = create_image_with_saturation(110)
+        pred, _, _, method = classifier.classify_image(image)
+        assert pred == 0
         assert method == "ACCEPT_MID_SAT"
 
     # ── NORMAL_SAT_TAMPINHA ───────────────────────────────────────────────
@@ -168,6 +197,15 @@ class TestClassifyImage:
         assert conf == 0.80
         assert method == "NORMAL_SAT_TAMPINHA"
 
+    def test_normal_sat_svm_rejeita(self, classifier: ImageClassifier):
+        """50 ≤ sat ≤ 100 com SVM=0 deve rejeitar."""
+        classifier.model.predict.return_value = [0]
+        image = create_image_with_saturation(75)
+        pred, conf, _, method = classifier.classify_image(image)
+        assert pred == 0
+        assert conf == 0.80
+        assert method == "NORMAL_SAT_TAMPINHA"
+
     # ── LOW_SAT_FORCE_TAMPINHA ────────────────────────────────────────────
 
     def test_low_sat_force_tampinha(self, classifier: ImageClassifier):
@@ -175,6 +213,15 @@ class TestClassifyImage:
         image = create_image_with_saturation(40)
         pred, conf, sat, method = classifier.classify_image(image)
         assert pred == 1
+        assert conf == 0.75
+        assert method == "LOW_SAT_FORCE_TAMPINHA"
+
+    def test_low_sat_com_svm_rejeita_nao_forca_aceite(self, classifier: ImageClassifier):
+        """30 ≤ sat < 50 com SVM=0 deve rejeitar (sem aceitação forçada)."""
+        classifier.model.predict.return_value = [0]
+        image = create_image_with_saturation(40)
+        pred, conf, _, method = classifier.classify_image(image)
+        assert pred == 0
         assert conf == 0.75
         assert method == "LOW_SAT_FORCE_TAMPINHA"
 

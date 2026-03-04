@@ -37,6 +37,12 @@ class TestSprint3Helpers:
     def test_is_admin_authenticated_com_token_valido_customizado(self):
         assert is_admin_authenticated('Bearer token_seguro', 'token_seguro') is True
 
+    def test_is_admin_authenticated_sem_prefixo_bearer(self):
+        assert is_admin_authenticated('token_seguro', 'token_seguro') is False
+
+    def test_is_admin_authenticated_com_token_diferente(self):
+        assert is_admin_authenticated('Bearer token_errado', 'token_seguro') is False
+
     def test_build_daily_trend_ignora_timestamp_invalido(self):
         deposits = [
             {'timestamp': time.time()},
@@ -48,12 +54,44 @@ class TestSprint3Helpers:
         assert all(isinstance(value, int) for value in trend['values'])
         assert sum(trend['values']) >= 1
 
+    def test_build_daily_trend_ignora_timestamp_fora_da_janela(self):
+        old_ts = time.time() - (30 * 24 * 3600)
+        trend = build_daily_trend([{'timestamp': old_ts}], days=7)
+        assert sum(trend['values']) == 0
+
     def test_build_analytics_report_com_lista_vazia(self):
         report = build_analytics_report([], [])
         assert report['kpis']['total_interactions'] == 0
         assert report['kpis']['accepted_deposits'] == 0
         assert report['kpis']['acceptance_rate_percent'] == 0.0
         assert report['interaction_results'] == {}
+
+    def test_build_analytics_report_com_valores_reais(self):
+        now = time.time()
+        deposits = [
+            {'timestamp': now, 'ml_confidence': 0.9, 'weight_value': 2500},
+            {'timestamp': now - 60, 'ml_confidence': 0.8, 'weight_value': 1500},
+        ]
+        interactions = [
+            {'resultado': 'sucesso'},
+            {'resultado': 'sucesso'},
+            {'resultado': 'rejeitado'},
+            {},  # força default 'desconhecido'
+        ]
+        report = build_analytics_report(deposits, interactions)
+
+        assert report['kpis']['total_interactions'] == 4
+        assert report['kpis']['accepted_deposits'] == 2
+        assert report['kpis']['rejected_or_failed'] == 2
+        assert report['kpis']['acceptance_rate_percent'] == 50.0
+        assert report['kpis']['avg_ml_confidence'] == 0.85
+        assert report['kpis']['avg_weight_grams'] == 2000.0
+        assert report['kpis']['total_recycled_kg'] == 4.0
+        assert report['interaction_results']['sucesso'] == 2
+        assert report['interaction_results']['rejeitado'] == 1
+        assert report['interaction_results']['desconhecido'] == 1
+        assert len(report['trend_7d']['labels']) == 7
+        assert isinstance(report['generated_at'], str)
 
     def test_ensure_db_connection_cria_quando_nao_existe(self):
         with patch('app.DatabaseConnection') as mock_db_cls:
