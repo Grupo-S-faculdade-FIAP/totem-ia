@@ -49,7 +49,7 @@ def classifier() -> ImageClassifier:
 
 class TestExtractColorFeatures:
     def test_retorna_8_features(self):
-        """extract_color_features deve retornar vetor com exatamente 8 valores."""
+        """extract_color_features deve retornar vetor com exatamente 8 valores (para o SVM)."""
         clf = ImageClassifier()
         image = create_image_with_saturation(100)
         features = clf.extract_color_features(image)
@@ -80,6 +80,28 @@ class TestExtractColorFeatures:
         f_baixa = clf.extract_color_features(image_baixa)
         assert f_alta is not None and f_baixa is not None
         assert f_alta[6] > f_baixa[6]
+
+    def test_cv_metrics_armazenados_apos_extracao(self):
+        """Após extract_color_features, métricas CV devem ser armazenadas no classificador."""
+        clf = ImageClassifier()
+        image = create_image_with_saturation(100)
+        clf.extract_color_features(image)
+        assert isinstance(clf._last_circularity, float)
+        assert isinstance(clf._last_aspect_ratio, float)
+        assert isinstance(clf._last_hough_count, int)
+        assert clf._last_circularity >= 0.0
+        assert clf._last_aspect_ratio >= 0.0
+        assert clf._last_hough_count >= 0
+
+    def test_features_sem_nan_em_imagem_preta(self):
+        """Imagem totalmente preta não deve gerar NaN (sem bordas → CV metrics = 0)."""
+        clf = ImageClassifier()
+        image = np.zeros((128, 128, 3), dtype=np.uint8)
+        features = clf.extract_color_features(image)
+        assert features is not None
+        assert not np.isnan(features).any()
+        assert clf._last_circularity == 0.0
+        assert clf._last_hough_count == 0
 
 
 # =============================================================================
@@ -187,6 +209,15 @@ class TestClassifyImage:
         assert pred == 0
         assert method == "ACCEPT_MID_SAT"
 
+    def test_mid_high_sat_pred_positivo_com_margem_calibrada_aceita(self, classifier: ImageClassifier):
+        """Predição positiva com margem acima do mínimo calibrado deve aceitar."""
+        classifier.model.predict.return_value = [1]
+        classifier.model.decision_function.return_value = [0.7]
+        image = create_image_with_saturation(110)
+        pred, _, _, method = classifier.classify_image(image)
+        assert pred == 1
+        assert method == "MID_HIGH_SAT"
+
     # ── NORMAL_SAT_TAMPINHA ───────────────────────────────────────────────
 
     def test_normal_sat_tampinha(self, classifier: ImageClassifier):
@@ -206,23 +237,33 @@ class TestClassifyImage:
         assert conf == 0.80
         assert method == "NORMAL_SAT_TAMPINHA"
 
+    def test_normal_sat_svm_aceita_com_margem_calibrada(self, classifier: ImageClassifier):
+        """50 ≤ sat ≤ 100 com margem acima do mínimo calibrado deve aceitar."""
+        classifier.model.predict.return_value = [1]
+        classifier.model.decision_function.return_value = [0.8]
+        image = create_image_with_saturation(75)
+        pred, _, _, method = classifier.classify_image(image)
+        assert pred == 1
+        assert method == "NORMAL_SAT_TAMPINHA"
+
     # ── LOW_SAT_FORCE_TAMPINHA ────────────────────────────────────────────
 
     def test_low_sat_force_tampinha(self, classifier: ImageClassifier):
-        """30 ≤ sat < 50 → LOW_SAT_FORCE_TAMPINHA, confiança = 0.75."""
+        """30 ≤ sat < 50 com SVM=1 e margem alta → LOW_SAT_FORCE_TAMPINHA, confiança = 0.65."""
+        classifier.model.decision_function.return_value = [2.5]  # margem >= 1.2
         image = create_image_with_saturation(40)
         pred, conf, sat, method = classifier.classify_image(image)
         assert pred == 1
-        assert conf == 0.75
+        assert conf == 0.65
         assert method == "LOW_SAT_FORCE_TAMPINHA"
 
     def test_low_sat_com_svm_rejeita_nao_forca_aceite(self, classifier: ImageClassifier):
-        """30 ≤ sat < 50 com SVM=0 deve rejeitar (sem aceitação forçada)."""
+        """30 ≤ sat < 50 com SVM=0 deve rejeitar com confiança = 0.70."""
         classifier.model.predict.return_value = [0]
         image = create_image_with_saturation(40)
         pred, conf, _, method = classifier.classify_image(image)
         assert pred == 0
-        assert conf == 0.75
+        assert conf == 0.70
         assert method == "LOW_SAT_FORCE_TAMPINHA"
 
     # ── DEBUG_MODE ────────────────────────────────────────────────────────
@@ -330,7 +371,7 @@ class TestImageClassifierErrorPaths:
         clf = ImageClassifier()
         clf.model = MagicMock()
         clf.scaler = MagicMock()
-        clf.extract_color_features = MagicMock(return_value=np.array([np.nan] * 8))
+        clf.extract_color_features = MagicMock(return_value=np.array([np.nan] * 12))
 
         pred, conf, sat, method = clf.classify_image(create_image_with_saturation(100))
 

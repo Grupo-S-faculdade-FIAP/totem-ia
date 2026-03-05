@@ -23,12 +23,14 @@ MODEL_PATH = Path("models/svm/svm_model_complete.pkl")
 SCALER_PATH = Path("models/svm/scaler_complete.pkl")
 
 POSITIVE_DIRS = [
+    Path("datasets/field-real/positive"),
     Path("datasets/color-cap/train/images"),
     Path("datasets/color-cap/valid/images"),
     Path("src/tampinhas"),
 ]
 
 NEGATIVE_DIRS = [
+    Path("datasets/field-real/negative"),
     Path("datasets/non-cap/train/images"),
     Path("datasets/non-cap/valid/images"),
     Path("datasets/negatives"),
@@ -38,7 +40,13 @@ VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
 
 def extract_8_features(image: np.ndarray | None) -> np.ndarray | None:
-    """Extrai o vetor de 8 features idêntico ao de produção."""
+    """Extrai o vetor de 8 features idêntico ao de produção (cor + saturação + contraste).
+    
+    Vetor: [mean_B, std_B, median_B, mean_G, std_G, median_G, sat_mean, contrast]
+    
+    A validação de circularidade (CV pre-screening) é feita separadamente em produção
+    com cv2.Canny + cv2.findContours, NÃO entra no vetor SVM.
+    """
     if image is None or not isinstance(image, np.ndarray):
         return None
     if image.ndim != 3 or image.shape[2] != 3:
@@ -53,10 +61,10 @@ def extract_8_features(image: np.ndarray | None) -> np.ndarray | None:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     features = np.array([
-        np.mean(b_channel), np.std(b_channel), np.median(b_channel),
-        np.mean(g_channel), np.std(g_channel), np.median(g_channel),
-        np.mean(hsv[:, :, 1]),
-        np.std(gray),
+        np.mean(b_channel), np.std(b_channel), np.median(b_channel),   # 0-2: canal B
+        np.mean(g_channel), np.std(g_channel), np.median(g_channel),   # 3-5: canal G
+        np.mean(hsv[:, :, 1]),                                          # 6: saturação HSV
+        np.std(gray),                                                   # 7: contraste
     ], dtype=np.float64)
     return features
 

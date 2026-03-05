@@ -27,7 +27,7 @@ def classifier() -> ImageClassifier:
     clf.scaler = MagicMock()
     clf.model.predict.return_value = [1]
     clf.model.decision_function.return_value = [1.2]
-    clf.scaler.transform.return_value = np.array([[0.1] * 8], dtype=np.float64)
+    clf.scaler.transform.return_value = np.array([[0.1] * 12], dtype=np.float64)
     return clf
 
 
@@ -53,12 +53,12 @@ def _solid_bgr_from_saturation(saturation: int, size: int = 64) -> np.ndarray:
     )
 )
 def test_extract_color_features_random_uint8_image_returns_valid_vector(image: np.ndarray) -> None:
-    """Para qualquer imagem uint8 HxWx3 válida, features devem ser vetor 8 sem NaN."""
+    """Para qualquer imagem uint8 HxWx3 válida, features devem ser vetor 12 sem NaN."""
     clf = ImageClassifier()
     features = clf.extract_color_features(image)
 
     assert features is not None
-    assert features.shape == (8,)
+    assert features.shape == (12,)
     assert not np.isnan(features).any()
     assert np.isfinite(features).all()
 
@@ -94,7 +94,7 @@ def test_classify_image_method_matches_saturation_buckets(
     classifier.scaler = MagicMock()
     classifier.model.predict.return_value = [1]
     classifier.model.decision_function.return_value = [1.2]
-    classifier.scaler.transform.return_value = np.array([[0.1] * 8], dtype=np.float64)
+    classifier.scaler.transform.return_value = np.array([[0.1] * 12], dtype=np.float64)
 
     image = _solid_bgr_from_saturation(saturation)
     pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=False)
@@ -129,7 +129,7 @@ def test_classify_rejects_when_margin_is_low_even_with_positive_pred(
     classifier.scaler = MagicMock()
     classifier.model.predict.return_value = [1]
     classifier.model.decision_function.return_value = [0.10]  # margem baixa
-    classifier.scaler.transform.return_value = np.array([[0.1] * 8], dtype=np.float64)
+    classifier.scaler.transform.return_value = np.array([[0.1] * 12], dtype=np.float64)
 
     image = _solid_bgr_from_saturation(saturation)
     pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=False)
@@ -160,7 +160,7 @@ def test_classify_accepts_when_margin_is_high_and_pred_positive(
     classifier.scaler = MagicMock()
     classifier.model.predict.return_value = [1]
     classifier.model.decision_function.return_value = [2.50]  # margem alta
-    classifier.scaler.transform.return_value = np.array([[0.1] * 8], dtype=np.float64)
+    classifier.scaler.transform.return_value = np.array([[0.1] * 12], dtype=np.float64)
 
     image = _solid_bgr_from_saturation(saturation)
     pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=False)
