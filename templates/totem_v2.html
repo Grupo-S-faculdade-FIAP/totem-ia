@@ -1142,6 +1142,7 @@
             document.getElementById('step2').classList.toggle('active', step >= 2);
             document.getElementById('step3').classList.toggle('active', step >= 3);
             validationMessage.textContent = message;
+            console.log(`[Etapa ${step}] ${message}`);
         }
 
         function hideValidationLoading() {
@@ -1170,17 +1171,24 @@
 
                 try {
                     // Chamar novo endpoint /api/validate-complete
+                    console.log('[validateComplete] Enviando request para /api/validate-complete');
                     const validateResponse = await fetch('/api/validate-complete', {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        timeout: 15000  // 15 segundos de timeout
                     });
 
+                    console.log(`[validateComplete] Response status: ${validateResponse.status}`);
+                    
                     const data = await validateResponse.json();
+                    console.log('[validateComplete] Response data:', data);
+                    
                     const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
 
                     if (!validateResponse.ok) {
                         hideValidationLoading();
-                        showError(data.error || 'Erro na validação. Tente novamente.');
+                        console.error('[validateComplete] Erro:', data);
+                        showError(`❌ ${data.error || 'Erro na validação. Tente novamente.'}`);
                         previewContainer.classList.add('show');
                         return;
                     }
@@ -1234,10 +1242,16 @@
                     // Som de sucesso
                     playSound('success');
 
+                    // Monitorar status ESP32 em background
+                    monitorEsp32Status();
+
                 } catch (error) {
                     hideValidationLoading();
-                    console.error('Erro:', error);
-                    showError('Erro ao conectar com o servidor. Tente novamente.');
+                    console.error('[validateComplete] Erro na requisição:', error);
+                    const errorMsg = error.name === 'AbortError' 
+                        ? '⏱️ Timeout: O servidor demorou muito. Verifique a conexão e tente novamente.'
+                        : `❌ Erro ao conectar com o servidor: ${error.message}`;
+                    showError(errorMsg);
                     previewContainer.classList.add('show');
                 }
             } catch (error) {
@@ -1252,6 +1266,39 @@
             startTime = Date.now();
             await validateComplete();
         });
+
+        // ── MONITORAR STATUS ESP32 ──────────────────────────────────────
+        async function monitorEsp32Status() {
+            console.log('[ESP32 Monitor] Iniciando monitoramento...');
+            
+            for (let i = 0; i < 10; i++) {  // Verificar 10 vezes
+                await new Promise(resolve => setTimeout(resolve, 1000));  // Aguardar 1s
+                
+                try {
+                    const response = await fetch('/api/esp32-status');
+                    const status = await response.json();
+                    
+                    console.log(`[ESP32 Monitor] Status ${i+1}: ${status.status} - ${status.message}`);
+                    
+                    // Mostrar status no console do browser
+                    if (status.status === 'validating') {
+                        console.log(`📡 ESP32 Validando... ${status.message}`);
+                    } else if (status.status === 'success') {
+                        console.log(`✅ ESP32 OK! ${status.message}`);
+                        console.log(`📋 Validação concluída: ${status.last_validation}`);
+                        break;  // Parou de monitorar quando sucesso
+                    } else if (status.status === 'error') {
+                        console.log(`❌ Erro ESP32: ${status.message}`);
+                        break;
+                    }
+                } catch (e) {
+                    console.log(`[ESP32 Monitor] Erro ao consultar status: ${e.message}`);
+                }
+            }
+            
+            console.log('[ESP32 Monitor] Monitoramento concluído');
+        }
+        // ────────────────────────────────────────────────────────────────
 
         // 🐛 EVENT LISTENER: Botão Debug Confirmar
         if (debugConfirmBtn) {

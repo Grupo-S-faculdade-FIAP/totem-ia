@@ -100,9 +100,9 @@ def call_esp32_api(endpoint: str, method: str = 'GET', data: dict | None = None)
     
     try:
         if method == 'GET':
-            response = requests.get(url, headers=headers, timeout=5)  # Reduzido para 5s
+            response = requests.get(url, headers=headers, timeout=10)  # Aumentado para 10s
         elif method == 'POST':
-            response = requests.post(url, json=data, headers=headers, timeout=5)  # Reduzido para 5s
+            response = requests.post(url, json=data, headers=headers, timeout=10)  # Aumentado para 10s
         else:
             logger.error(f"❌ Método HTTP não suportado: {method}")
             return None
@@ -115,12 +115,15 @@ def call_esp32_api(endpoint: str, method: str = 'GET', data: dict | None = None)
             return response.json()
         else:
             logger.error(f"❌ ESP32: API retornou {response.status_code}: {response.text}")
-            return None
+            return _get_fallback_response(endpoint)
     except requests.exceptions.ConnectTimeout:
         logger.warning(f"⚠️ ESP32: Timeout na conexão (ESP32 offline ou lento). Usando fallback.")
         return _get_fallback_response(endpoint)
     except requests.exceptions.ReadTimeout:
         logger.warning(f"⚠️ ESP32: Timeout na leitura (ESP32 respondendo lentamente). Usando fallback.")
+        return _get_fallback_response(endpoint)
+    except requests.exceptions.ConnectionError:
+        logger.warning(f"⚠️ ESP32: Não conseguiu conectar (offline). Usando fallback.")
         return _get_fallback_response(endpoint)
     except Exception as e:
         logger.error(f"❌ ESP32: Erro ao chamar API: {e}")

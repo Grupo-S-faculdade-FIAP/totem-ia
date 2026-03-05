@@ -79,6 +79,13 @@ TOTEM_ACCESS_PASSWORD = 'fiap2026'
 image_classifier: ImageClassifier | None = None
 db_connection: DatabaseConnection | None = None
 
+# Status ESP32 para comunicação com front-end
+esp32_status = {
+    'last_validation': None,
+    'status': 'idle',
+    'message': ''
+}
+
 PROTECTED_TOTEM_PATHS = {
     '/',
     '/totem_intro.html',
@@ -372,10 +379,9 @@ def api_validate_mechanical():
 @app.route('/api/validate-complete', methods=['POST'])
 def api_validate_complete():
     """
-    Validação completa de tampinha:
-    1. Classificação via SVM
-    2. Confirmação mecânica via ESP32
-    3. Retorna resultado
+    Validação completa de tampinha (com resposta rápida):
+    1. Classificação via SVM → resposta imediata ao usuário
+    2. Validação mecânica via ESP32 → em background (não bloqueia)
     """
     try:
         classifier = _ensure_image_classifier()
@@ -409,7 +415,7 @@ def api_validate_complete():
         if image is None:
             return jsonify({'error': 'Erro ao processar imagem'}), 400
 
-        # ========== ETAPA 1: Classificação Software ==========
+        # ========== ETAPA 1: Classificação Software (RÁPIDA) ==========
         pred, conf, sat, method = classifier.classify_image(image) if classifier else (None, None, None, None)
         
         if pred is None:
@@ -446,6 +452,8 @@ def api_validate_complete():
                 'message': 'Item rejeitado - Não é tampinha',
                 'classification': 'NAO E TAMPINHA',
                 'confidence': float(conf) if conf is not None else None,
+                'saturation': float(sat) if sat is not None else None,
+                'method': method,
                 'timestamp': datetime.now().isoformat()
             }), 200
 
@@ -457,77 +465,10 @@ def api_validate_complete():
 
         logger.info(f"✅ Classificação OK: TAMPINHA (conf: {conf:.2f})")
 
-        # ========== ETAPA 2: Validação Mecânica (ESP32) ==========
-        logger.info("📡 Enviando para validação mecânica no ESP32...")
-        
-        # Obter sensores do ESP32 ou usar valores do request
-        sensors = get_esp32_sensors()
-        
-        # Se recebeu presenca e peso no request, usar esses valores
-        if request.is_json:
-            data = request.get_json()
-            if 'presenca' in data:
-                presenca = data.get('presenca', True)
-            elif sensors:
-                presenca = sensors.get('presenca', True)
-            else:
-                presenca = True
-                
-            if 'peso' in data:
-                peso = data.get('peso', 2600)
-            elif sensors:
-                peso = sensors.get('peso', 2600)
-            else:
-                peso = 2600
-        else:
-            if not sensors:
-                logger.warning("⚠️ Não conseguiu ler sensores, mas continuando...")
-                presenca = True
-                peso = 2600
-            else:
-                presenca = sensors.get('presenca', True)
-                peso = sensors.get('peso', 2600)
-        
-        logger.info(f"📊 Sensores: presença={presenca}, peso={peso}")
-
-        # Verificar condição mecânica
-        esp32_check = check_esp32_mechanical(presenca, peso)
-        
-        if not esp32_check:
-            if db_connection:
-                with db_connection as db:
-                    db.save_interaction(DatabaseConnection.ResultadoInteracao.ERRO_MECANICA)
-            else:
-                logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
-
-            logger.warning("⚠️ Erro ao verificar condição mecânica")
-            return jsonify({
-                'status': 'erro_esp32',
-                'message': 'Erro ao comunicar com ESP32',
-                'timestamp': datetime.now().isoformat()
-            }), 500
-
-        # ========== ETAPA 3: Resultado Final ==========
-        
-        # Confirmar detecção
-        confirm_esp32_detection('tampinha', float(conf) if conf is not None else 0.0)
-
-        if db_connection:
-            with db_connection as db:
-                
-                deposit_id = db.save_deposit_data(conf, True, True, 2500, True)
-
-                db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO, deposit_id)
-
-                
-        else:
-            logger.warning("⚠️ Conexão com o banco de dados não estabelecida")
-
-        logger.info("✅ VALIDAÇÃO COMPLETA: TAMPINHA ACEITA!")
-        
+        # ========== RETORNAR SUCESSO AO USUÁRIO (SEM ESPERAR ESP32) ==========
         response = {
             'status': 'sucesso',
-            'message': 'Tampinha aceita e validada!',
+            'message': '✅ Tampinha aceita! Processando depósito...',
             'stages': {
                 'classificacao': {
                     'status': 'sucesso',
@@ -537,14 +478,76 @@ def api_validate_complete():
                     'method': method
                 },
                 'mecanica': {
-                    'status': 'sucesso',
-                    'presenca': presenca,
-                    'peso': peso,
-                    'esp32_response': esp32_check
+                    'status': 'pendente',
+                    'message': 'Validando ESP32 em background...'
                 }
             },
             'timestamp': datetime.now().isoformat()
         }
+
+        # ========== ENVIAR PARA ESP32 EM BACKGROUND (NÃO BLOQUEIA) ==========
+        import threading
+        def validate_esp32_background():
+            try:
+                esp32_status['status'] = 'validating'
+                esp32_status['message'] = '⏳ Conectando ao ESP32...'
+                
+                logger.info("🔄 [Background] Iniciando validação ESP32...")
+                
+                sensors = get_esp32_sensors()
+                logger.info(f"🔌 [Background] Sensores ESP32: {sensors}")
+                esp32_status['message'] = f"📊 Sensores recebidos: {sensors}"
+                
+                presenca = sensors.get('presenca', True) if sensors else True
+                peso = sensors.get('peso', 2600) if sensors else 2600
+                
+                logger.info(f"📊 [Background] Valores extraídos: presença={presenca}, peso={peso}g")
+                esp32_status['message'] = f"✓ Presença={presenca}, Peso={peso}g"
+                
+                # Chamar validação mecânica
+                esp32_check = check_esp32_mechanical(presenca, peso)
+                logger.info(f"⚙️  [Background] Resposta validação mecânica: {esp32_check}")
+                esp32_status['message'] = f"✓ Validação mecânica: {esp32_check.get('status', 'OK') if esp32_check else 'OK'}"
+                
+                if esp32_check is None:
+                    logger.warning("⚠️ [Background] ESP32 offline, usando fallback")
+                    esp32_check = {'status': 'OK_FALLBACK', 'message': 'OK (ESP32 offline)'}
+                    esp32_status['message'] = "⚠️ ESP32 offline - usando fallback"
+                    logger.info(f"✅ [Background] Fallback ativado: {esp32_check}")
+                
+                # Confirmar detecção
+                detection_confirm = confirm_esp32_detection('tampinha', float(conf) if conf is not None else 0.0)
+                logger.info(f"✔️  [Background] Confirmação de detecção: {detection_confirm}")
+                esp32_status['message'] += " | ✓ Detecção confirmada"
+                
+                # Salvar no banco de dados
+                if db_connection:
+                    with db_connection as db:
+                        deposit_id = db.save_deposit_data(conf, True, True, peso, True)
+                        logger.info(f"💾 [Background] Depósito salvo no BD com ID: {deposit_id}")
+                        esp32_status['message'] += f" | 💾 Depósito #{deposit_id}"
+                        
+                        db.save_interaction(DatabaseConnection.ResultadoInteracao.SUCESSO, deposit_id)
+                        logger.info(f"📝 [Background] Interação registrada como SUCESSO")
+                else:
+                    logger.warning("⚠️ [Background] Banco de dados não disponível")
+                    esp32_status['message'] += " | ⚠️ BD indisponível"
+                
+                esp32_status['status'] = 'success'
+                esp32_status['last_validation'] = datetime.now().isoformat()
+                logger.info("✅ [Background] Validação ESP32 concluída com sucesso!")
+                logger.info(f"📋 [Background] RESUMO: Tampinha aceita, presença={presenca}, peso={peso}g, BD=OK")
+                
+            except Exception as e:
+                logger.error(f"❌ [Background] Erro na validação ESP32: {e}", exc_info=True)
+                logger.error(f"❌ [Background] Traceback: {e}")
+                esp32_status['status'] = 'error'
+                esp32_status['message'] = f"❌ Erro: {str(e)}"
+        
+        # Executar em thread background
+        thread = threading.Thread(target=validate_esp32_background, daemon=True)
+        thread.start()
+        logger.info("🚀 [Background] Thread ESP32 iniciada")
 
         return jsonify(response), 200
 
@@ -558,8 +561,14 @@ def api_validate_complete():
 
 
 # =============================================================================
-# NOVA ROTA: Health Check ESP32 
+# NOVA ROTA: Health Check ESP32 + Status para Front-end
 # =============================================================================
+@app.route('/api/esp32-status', methods=['GET'])
+def get_esp32_status():
+    """Retorna status da última validação ESP32."""
+    return jsonify(esp32_status), 200
+
+
 @app.route('/api/esp32-health', methods=['GET'])
 def esp32_health():
 

@@ -40,7 +40,13 @@ VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
 
 def extract_8_features(image: np.ndarray | None) -> np.ndarray | None:
-    """Extrai o vetor de 12 features idêntico ao de produção (8 cor + 4 borda/forma)."""
+    """Extrai o vetor de 8 features idêntico ao de produção (cor + saturação + contraste).
+    
+    Vetor: [mean_B, std_B, median_B, mean_G, std_G, median_G, sat_mean, contrast]
+    
+    A validação de circularidade (CV pre-screening) é feita separadamente em produção
+    com cv2.Canny + cv2.findContours, NÃO entra no vetor SVM.
+    """
     if image is None or not isinstance(image, np.ndarray):
         return None
     if image.ndim != 3 or image.shape[2] != 3:
@@ -54,34 +60,12 @@ def extract_8_features(image: np.ndarray | None) -> np.ndarray | None:
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # features 0-7: cor + saturação + contraste
-    base_features = [
-        np.mean(b_channel), np.std(b_channel), np.median(b_channel),
-        np.mean(g_channel), np.std(g_channel), np.median(g_channel),
-        np.mean(hsv[:, :, 1]),
-        np.std(gray),
-    ]
-
-    # features 8-11: borda e forma (Canny + contornos)
-    edges = cv2.Canny(gray, 50, 150)
-    edge_density = float(np.count_nonzero(edges)) / (128 * 128)
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    contour_count = float(len(contours))
-
-    if contours:
-        largest = max(contours, key=cv2.contourArea)
-        area = cv2.contourArea(largest)
-        perim = cv2.arcLength(largest, True)
-        circularity = (4 * np.pi * area / (perim ** 2)) if perim > 0 else 0.0
-        area_ratio = area / (128 * 128)
-    else:
-        circularity = 0.0
-        area_ratio = 0.0
-
-    features = np.array(
-        base_features + [edge_density, contour_count, float(circularity), float(area_ratio)],
-        dtype=np.float64,
-    )
+    features = np.array([
+        np.mean(b_channel), np.std(b_channel), np.median(b_channel),   # 0-2: canal B
+        np.mean(g_channel), np.std(g_channel), np.median(g_channel),   # 3-5: canal G
+        np.mean(hsv[:, :, 1]),                                          # 6: saturação HSV
+        np.std(gray),                                                   # 7: contraste
+    ], dtype=np.float64)
     return features
 
 
