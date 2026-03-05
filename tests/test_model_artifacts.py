@@ -38,20 +38,20 @@ class TestModelArtifacts:
         assert MODEL_PATH.exists(), f"Modelo não encontrado: {MODEL_PATH}"
         assert SCALER_PATH.exists(), f"Scaler não encontrado: {SCALER_PATH}"
 
-    def test_artifacts_are_trained_for_8_features(self):
-        """Modelo e scaler de produção devem estar treinados com 8 features."""
+    def test_artifacts_are_trained_for_12_features(self):
+        """Modelo e scaler de produção devem estar treinados com 12 features."""
         model = joblib.load(MODEL_PATH)
         scaler = joblib.load(SCALER_PATH)
 
-        assert getattr(model, "n_features_in_", None) == 8
-        assert getattr(scaler, "n_features_in_", None) == 8
+        assert getattr(model, "n_features_in_", None) == 12
+        assert getattr(scaler, "n_features_in_", None) == 12
 
     def test_scaler_and_model_pipeline_smoke(self):
-        """Pipeline scaler -> model deve processar vetor (1, 8) sem erro."""
+        """Pipeline scaler -> model deve processar vetor (1, 12) sem erro."""
         model = joblib.load(MODEL_PATH)
         scaler = joblib.load(SCALER_PATH)
 
-        x = np.zeros((1, 8), dtype=np.float64)
+        x = np.zeros((1, 12), dtype=np.float64)
         x_scaled = scaler.transform(x)
         pred = model.predict(x_scaled)
         decision = model.decision_function(x_scaled)

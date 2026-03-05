@@ -39,7 +39,7 @@ def classifier() -> ImageClassifier:
     clf.scaler = MagicMock()
     clf.model.predict.return_value = [1]
     clf.model.decision_function.return_value = [2.5]
-    clf.scaler.transform.return_value = np.array([[0.5] * 8])
+    clf.scaler.transform.return_value = np.array([[0.5] * 12])
     return clf
 
 
@@ -48,13 +48,13 @@ def classifier() -> ImageClassifier:
 # =============================================================================
 
 class TestExtractColorFeatures:
-    def test_retorna_8_features(self):
-        """extract_color_features deve retornar vetor com exatamente 8 valores."""
+    def test_retorna_12_features(self):
+        """extract_color_features deve retornar vetor com exatamente 12 valores."""
         clf = ImageClassifier()
         image = create_image_with_saturation(100)
         features = clf.extract_color_features(image)
         assert features is not None
-        assert features.shape == (8,)
+        assert features.shape == (12,)
 
     def test_imagem_invalida_retorna_none(self):
         """Entrada que não é ndarray deve retornar None."""
@@ -80,6 +80,50 @@ class TestExtractColorFeatures:
         f_baixa = clf.extract_color_features(image_baixa)
         assert f_alta is not None and f_baixa is not None
         assert f_alta[6] > f_baixa[6]
+
+    def test_edge_density_entre_zero_e_um(self):
+        """features[8] (edge_density) deve estar em [0, 1]."""
+        clf = ImageClassifier()
+        image = create_image_with_saturation(100)
+        features = clf.extract_color_features(image)
+        assert features is not None
+        assert 0.0 <= features[8] <= 1.0
+
+    def test_contour_count_nao_negativo(self):
+        """features[9] (contour_count) deve ser >= 0."""
+        clf = ImageClassifier()
+        image = create_image_with_saturation(100)
+        features = clf.extract_color_features(image)
+        assert features is not None
+        assert features[9] >= 0.0
+
+    def test_circularity_entre_zero_e_um_para_imagem_solida(self):
+        """features[10] (circularity) deve estar em [0, 1.1] para imagem uniforme."""
+        clf = ImageClassifier()
+        image = create_image_with_saturation(150)
+        features = clf.extract_color_features(image)
+        assert features is not None
+        assert 0.0 <= features[10] <= 1.1
+
+    def test_area_ratio_entre_zero_e_um(self):
+        """features[11] (area_ratio) deve estar em [0, 1]."""
+        clf = ImageClassifier()
+        image = create_image_with_saturation(100)
+        features = clf.extract_color_features(image)
+        assert features is not None
+        assert 0.0 <= features[11] <= 1.0
+
+    def test_features_sem_nan_em_imagem_preta(self):
+        """Imagem totalmente preta não deve gerar NaN nas features de borda."""
+        clf = ImageClassifier()
+        image = np.zeros((128, 128, 3), dtype=np.uint8)
+        features = clf.extract_color_features(image)
+        assert features is not None
+        assert not np.isnan(features).any()
+        assert features[8] == 0.0  # sem bordas em imagem preta
+        assert features[9] == 0.0  # sem contornos
+        assert features[10] == 0.0  # circularity = 0 quando sem contornos
+        assert features[11] == 0.0  # area_ratio = 0 quando sem contornos
 
 
 # =============================================================================
@@ -187,6 +231,15 @@ class TestClassifyImage:
         assert pred == 0
         assert method == "ACCEPT_MID_SAT"
 
+    def test_mid_high_sat_pred_positivo_com_margem_calibrada_aceita(self, classifier: ImageClassifier):
+        """Predição positiva com margem acima do mínimo calibrado deve aceitar."""
+        classifier.model.predict.return_value = [1]
+        classifier.model.decision_function.return_value = [0.7]
+        image = create_image_with_saturation(110)
+        pred, _, _, method = classifier.classify_image(image)
+        assert pred == 1
+        assert method == "MID_HIGH_SAT"
+
     # ── NORMAL_SAT_TAMPINHA ───────────────────────────────────────────────
 
     def test_normal_sat_tampinha(self, classifier: ImageClassifier):
@@ -204,6 +257,15 @@ class TestClassifyImage:
         pred, conf, _, method = classifier.classify_image(image)
         assert pred == 0
         assert conf == 0.80
+        assert method == "NORMAL_SAT_TAMPINHA"
+
+    def test_normal_sat_svm_aceita_com_margem_calibrada(self, classifier: ImageClassifier):
+        """50 ≤ sat ≤ 100 com margem acima do mínimo calibrado deve aceitar."""
+        classifier.model.predict.return_value = [1]
+        classifier.model.decision_function.return_value = [0.8]
+        image = create_image_with_saturation(75)
+        pred, _, _, method = classifier.classify_image(image)
+        assert pred == 1
         assert method == "NORMAL_SAT_TAMPINHA"
 
     # ── LOW_SAT_FORCE_TAMPINHA ────────────────────────────────────────────
@@ -313,7 +375,7 @@ class TestImageClassifierErrorPaths:
         features = clf.extract_color_features(image)
 
         assert features is not None
-        assert features.shape == (8,)
+        assert features.shape == (12,)
 
     def test_extract_features_trata_excecao_interna(self, monkeypatch):
         """Erro interno em cv2.resize deve retornar None."""
@@ -330,7 +392,7 @@ class TestImageClassifierErrorPaths:
         clf = ImageClassifier()
         clf.model = MagicMock()
         clf.scaler = MagicMock()
-        clf.extract_color_features = MagicMock(return_value=np.array([np.nan] * 8))
+        clf.extract_color_features = MagicMock(return_value=np.array([np.nan] * 12))
 
         pred, conf, sat, method = clf.classify_image(create_image_with_saturation(100))
 

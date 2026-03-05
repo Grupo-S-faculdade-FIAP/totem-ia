@@ -203,6 +203,45 @@
             object-fit: cover;
         }
 
+        #contourCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            border-radius: 18px;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        #contourCanvas.active {
+            opacity: 1;
+        }
+
+        .contour-badge {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.65);
+            color: #00e5ff;
+            font-size: 0.72em;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            padding: 4px 12px;
+            border-radius: 20px;
+            pointer-events: none;
+            display: none;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            white-space: nowrap;
+        }
+
+        .contour-badge.active {
+            display: block;
+        }
+
         .camera-overlay {
             position: absolute;
             top: 0;
@@ -790,9 +829,11 @@
             <div class="upload-section">
                 <div class="upload-box" id="uploadBox">
                     <video id="videoPreview" autoplay playsinline></video>
+                    <canvas id="contourCanvas"></canvas>
                     <div class="camera-overlay">
                         <div class="camera-reticle"></div>
                     </div>
+                    <div class="contour-badge" id="contourBadge">⬡ Edge Detection ativo</div>
                 </div>
 
                 <!-- PREVIEW -->
@@ -942,6 +983,91 @@
         let capturedImage = null;
         let startTime = null;
 
+        // ── EDGE DETECTION ──────────────────────────────────────────────────
+        const contourCanvas = document.getElementById('contourCanvas');
+        const contourBadge  = document.getElementById('contourBadge');
+        const contourCtx    = contourCanvas.getContext('2d', { willReadFrequently: true });
+        const offCanvas     = document.createElement('canvas');
+        const offCtx        = offCanvas.getContext('2d', { willReadFrequently: true });
+        let   edgeAnimId    = null;
+        let   frameSkip     = 0;
+
+        function sobelEdges(imageData) {
+            const src = imageData.data;
+            const w   = imageData.width;
+            const h   = imageData.height;
+            const out = new Uint8ClampedArray(src.length); // all zeros = fully transparent
+
+            for (let y = 1; y < h - 1; y++) {
+                for (let x = 1; x < w - 1; x++) {
+                    const g = (px, py) => {
+                        const i = (py * w + px) * 4;
+                        return (src[i] * 77 + src[i+1] * 150 + src[i+2] * 29) >> 8; // fast luminance
+                    };
+                    const tl=g(x-1,y-1), tc=g(x,y-1), tr=g(x+1,y-1);
+                    const ml=g(x-1,y  ),              mr=g(x+1,y  );
+                    const bl=g(x-1,y+1), bc=g(x,y+1), br=g(x+1,y+1);
+
+                    const gx = -tl - 2*ml - bl + tr + 2*mr + br;
+                    const gy = -tl - 2*tc - tr + bl + 2*bc + br;
+                    const mag = Math.sqrt(gx*gx + gy*gy);
+
+                    if (mag > 45) {
+                        const i = (y * w + x) * 4;
+                        const intensity = Math.min(255, mag * 1.2 | 0);
+                        out[i]   = 0;           // R
+                        out[i+1] = intensity;   // G  → verde-ciano
+                        out[i+2] = intensity;   // B
+                        out[i+3] = Math.min(220, intensity + 60); // Alpha
+                    }
+                }
+            }
+            return new ImageData(out, w, h);
+        }
+
+        function runEdgeDetection() {
+            if (!cameraActive || videoPreview.readyState < 2) {
+                edgeAnimId = requestAnimationFrame(runEdgeDetection);
+                return;
+            }
+
+            // Processa 1 a cada 2 frames para economizar CPU
+            frameSkip = (frameSkip + 1) % 2;
+            if (frameSkip === 0) {
+                const vw = videoPreview.videoWidth;
+                const vh = videoPreview.videoHeight;
+                if (vw === 0) { edgeAnimId = requestAnimationFrame(runEdgeDetection); return; }
+
+                offCanvas.width  = vw;
+                offCanvas.height = vh;
+                offCtx.drawImage(videoPreview, 0, 0, vw, vh);
+
+                const imgData   = offCtx.getImageData(0, 0, vw, vh);
+                const edgeData  = sobelEdges(imgData);
+
+                contourCanvas.width  = vw;
+                contourCanvas.height = vh;
+                contourCtx.clearRect(0, 0, vw, vh);
+                contourCtx.putImageData(edgeData, 0, 0);
+            }
+
+            edgeAnimId = requestAnimationFrame(runEdgeDetection);
+        }
+
+        function startEdgeDetection() {
+            contourCanvas.classList.add('active');
+            contourBadge.classList.add('active');
+            if (!edgeAnimId) runEdgeDetection();
+        }
+
+        function stopEdgeDetection() {
+            if (edgeAnimId) { cancelAnimationFrame(edgeAnimId); edgeAnimId = null; }
+            contourCanvas.classList.remove('active');
+            contourBadge.classList.remove('active');
+            contourCtx.clearRect(0, 0, contourCanvas.width, contourCanvas.height);
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         // START CAMERA
         startCameraBtn.addEventListener('click', initializeCamera);
 
@@ -953,6 +1079,7 @@
 
                 videoPreview.srcObject = stream;
                 cameraActive = true;
+                videoPreview.addEventListener('loadedmetadata', startEdgeDetection, { once: true });
                 startCameraBtn.innerHTML = '<i class="fas fa-camera"></i> Capturar Foto';
                 startCameraBtn.onclick = capturePhoto;
                 showInfo('Câmera iniciada! Clique em "Capturar Foto" para fotografar.', 'info');
@@ -963,6 +1090,7 @@
         }
 
         function capturePhoto() {
+            stopEdgeDetection();
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
 
@@ -990,6 +1118,7 @@
 
             startCameraBtn.innerHTML = '<i class="fas fa-camera"></i> Capturar Foto';
             startCameraBtn.onclick = capturePhoto;
+            startEdgeDetection();
         }
 
         // CLASSIFY BUTTON
@@ -1307,6 +1436,7 @@
             if (cameraActive) {
                 startCameraBtn.innerHTML = '<i class="fas fa-camera"></i> Capturar Foto';
                 startCameraBtn.onclick = capturePhoto;
+                startEdgeDetection();
             }
         }
 
@@ -1390,6 +1520,7 @@
 
         // CLEANUP
         window.addEventListener('beforeunload', () => {
+            stopEdgeDetection();
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
