@@ -29,6 +29,7 @@ SVM_MIN_MARGIN_HIGH_SAT =  0.80  # margem para SAT_HIGH calibrada por benchmark 
 # =============================================================================
 CV_MIN_CIRCULARITY      = 0.72  # Tampinha real: 0.80-0.95 | Rosto: 0.50-0.70 | invariante a escala
 CV_MIN_ASPECT_RATIO     = 0.82  # Bounding box da tampinha ≈ quadrado (w/h ≈ 1.0) | Rosto: 0.60-0.78
+CV_MIN_CONTOUR_AREA     = 150   # pixels² em 128×128 (≈ r≥7px) — filtra olhos/botões pequenos
 
 # =============================================================================
 # Seção 6 (ml-conventions): Caminhos de modelo — constantes, nunca inline
@@ -44,7 +45,9 @@ class ImageClassifier:
         self._last_circularity = 0.0
         self._last_contour_count = 0.0
         self._last_aspect_ratio = 0.0
+        self._last_contour_area = 0.0
         self._last_hough_count = 0
+        self._last_hough_consistent = False
 
     def load_classifier(self):
 
@@ -119,36 +122,54 @@ class ImageClassifier:
             # CV metrics para pre-screening — não entram no vetor SVM
             blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-            # HoughCircles: detecta círculos reais (tampinha tem borda circular forte)
-            # Rosto não tem borda circular bem definida → HoughCircles não detecta
-            hough_circles = cv2.HoughCircles(
-                blurred, cv2.HOUGH_GRADIENT,
-                dp=1.2, minDist=30,
-                param1=60, param2=22,
-                minRadius=8, maxRadius=60
-            )
-            hough_count = int(len(hough_circles[0])) if hough_circles is not None else 0
-
             # Canny + contornos: circularidade e aspect ratio do maior contorno
-            edges = cv2.Canny(blurred, 40, 120)
+            edges = cv2.Canny(blurred, 30, 100)
             contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             contour_count = float(len(contours))
 
             circularity = 0.0
             aspect_ratio = 0.0
+            contour_area = 0.0
             if contours:
                 largest = max(contours, key=cv2.contourArea)
-                area = cv2.contourArea(largest)
+                contour_area = float(cv2.contourArea(largest))
                 perim = cv2.arcLength(largest, True)
-                circularity = (4 * np.pi * area / (perim ** 2)) if perim > 0 else 0.0
+                circularity = (4 * np.pi * contour_area / (perim ** 2)) if perim > 0 else 0.0
                 x, y, w, h = cv2.boundingRect(largest)
                 aspect_ratio = float(min(w, h)) / float(max(w, h)) if max(w, h) > 0 else 0.0
+
+            # HoughCircles: detecta círculos com borda bem definida (aro da tampinha).
+            # param2=28 exige borda circular forte.
+            hough_circles = cv2.HoughCircles(
+                blurred, cv2.HOUGH_GRADIENT,
+                dp=1.2, minDist=30,
+                param1=60, param2=28,
+                minRadius=8, maxRadius=60
+            )
+
+            # Valida consistência Hough × contorno:
+            # Se Hough detectou um círculo pequeno (olho, óculos) mas o maior contorno é grande
+            # (rosto inteiro), o ratio de área será muito alto → rejeita.
+            # Tampinha: contorno_area ≈ π × hough_r² → ratio ≈ 1.0.
+            hough_count = 0
+            hough_contour_consistent = False
+            if hough_circles is not None:
+                best_hough_r = float(max(hough_circles[0], key=lambda c: c[2])[2])
+                hough_expected_area = np.pi * best_hough_r ** 2
+                if contour_area > 0 and hough_expected_area > 0:
+                    area_ratio_hough = contour_area / hough_expected_area
+                    hough_contour_consistent = 0.4 <= area_ratio_hough <= 3.0
+                else:
+                    hough_contour_consistent = True  # sem contorno → confiar no Hough
+                hough_count = int(len(hough_circles[0]))
 
             # Guardar CV metrics para pre-screening (não incluir no vetor SVM)
             self._last_circularity = float(circularity)
             self._last_contour_count = contour_count
             self._last_aspect_ratio = float(aspect_ratio)
+            self._last_contour_area = float(contour_area)
             self._last_hough_count = hough_count
+            self._last_hough_consistent = hough_contour_consistent
 
             # Não incluir features de borda no output (modelo foi treinado com 8 features apenas)
             return np.array(features[:8])
@@ -176,6 +197,8 @@ class ImageClassifier:
             contour_count = self._last_contour_count
             aspect_ratio = self._last_aspect_ratio
             hough_count = self._last_hough_count
+            hough_consistent = self._last_hough_consistent
+            contour_area = self._last_contour_area
 
             logger.info(f"✅ Features extraídas. Shape: {features.shape}, Saturação: {saturation:.1f}")
             logger.info(
@@ -214,16 +237,26 @@ class ImageClassifier:
             svm_margin = abs(float(svm_conf))
 
             # cv_confirmed_circle: CV confirma com SEGURANÇA que o objeto é circular.
-            # HoughCircles sozinho não basta — um oval pode ter Hough detectado.
-            # Exige que: Hough detectado E (sem contornos OU aspect_ratio válido no contorno)
+            # Exige que Hough E contorno concordem — evita aceitar rostos ou olhos.
+            #
+            # Hough detecta olho pequeno (r~8) mas contorno é o rosto inteiro (área enorme)
+            # → hough_consistent=False → rejeitado.
+            #
+            # Tampinha: Hough detecta o aro (r~20-55), contorno = a própria tampinha
+            # → areas compatíveis → hough_consistent=True → aceito.
             hough_with_valid_shape = (
                 hough_count > 0
-                and (contour_count == 0 or aspect_ratio >= CV_MIN_ASPECT_RATIO)
+                and hough_consistent
+                and (
+                    contour_count == 0
+                    or (circularity >= CV_MIN_CIRCULARITY and aspect_ratio >= CV_MIN_ASPECT_RATIO)
+                )
             )
             contour_circular = (
                 contour_count > 0
                 and circularity >= CV_MIN_CIRCULARITY
                 and aspect_ratio >= CV_MIN_ASPECT_RATIO
+                and contour_area >= CV_MIN_CONTOUR_AREA  # filtra olhos/botões pequenos
             )
             cv_confirmed_circle = hough_with_valid_shape or contour_circular
 
