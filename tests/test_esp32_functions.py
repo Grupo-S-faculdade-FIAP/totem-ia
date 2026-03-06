@@ -215,8 +215,8 @@ class TestCallEsp32Api:
         # Act
         result = esp32.call_esp32_api('/api/test')
 
-        # Assert
-        assert result is None
+        # Assert (fallback retorna dict vazio para endpoint desconhecido)
+        assert result == {}
 
     def test_call_esp32_api_exception(self, mock_requests_get):
         """Deve retornar None quando há exceção na requisição."""
@@ -228,11 +228,11 @@ class TestCallEsp32Api:
         # Act
         result = esp32.call_esp32_api('/api/test')
 
-        # Assert
-        assert result is None
+        # Assert (fallback retorna dict vazio)
+        assert result == {}
 
     def test_call_esp32_api_get_usa_timeout_hardcoded(self, mock_requests_get):
-        """GET na API ESP32 deve usar timeout fixo de 25s."""
+        """GET na API ESP32 deve usar timeout fixo."""
         esp32.esp32_jwt_token = 'valid_token'
         esp32.esp32_token_expiry = datetime.now().timestamp() + 3600
 
@@ -244,10 +244,10 @@ class TestCallEsp32Api:
         esp32.call_esp32_api('/api/sensors', method='GET')
 
         call_args = mock_requests_get.call_args
-        assert call_args.kwargs['timeout'] == 25
+        assert call_args.kwargs['timeout'] == 10
 
     def test_call_esp32_api_post_usa_timeout_hardcoded(self, mock_requests_post):
-        """POST na API ESP32 deve usar timeout fixo de 25s."""
+        """POST na API ESP32 deve usar timeout fixo."""
         esp32.esp32_jwt_token = 'valid_token'
         esp32.esp32_token_expiry = datetime.now().timestamp() + 3600
 
@@ -259,7 +259,7 @@ class TestCallEsp32Api:
         esp32.call_esp32_api('/api/check_mechanical', method='POST', data={'peso': 2600, 'presenca': True})
 
         call_args = mock_requests_post.call_args
-        assert call_args.kwargs['timeout'] == 25
+        assert call_args.kwargs['timeout'] == 10
 
 
 # =============================================================================

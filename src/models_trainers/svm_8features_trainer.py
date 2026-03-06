@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 MODEL_PATH = Path("models/svm/svm_model_complete.pkl")
 SCALER_PATH = Path("models/svm/scaler_complete.pkl")
+METRICS_PATH = Path("models/svm/metrics_last.json")
 
 # ROI central: paridade com produção (image.py)
 ROI_CENTER_RATIO = 0.75
@@ -248,6 +250,28 @@ def train_and_save() -> None:
     joblib.dump(scaler, SCALER_PATH)
     logger.info(f"💾 Modelo salvo em: {MODEL_PATH}")
     logger.info(f"💾 Scaler salvo em: {SCALER_PATH}")
+
+    # Persistir métricas em JSON para evidência e auditoria
+    metrics = {
+        "n_samples": len(x),
+        "n_positives": len(positives),
+        "n_negatives": len(negatives),
+        "n_features": x.shape[1],
+        "holdout": {
+            "precision_tampinha": float(precision),
+            "recall_tampinha": float(recall),
+            "confusion_matrix": cm.tolist(),
+        },
+        "cv_accuracy": {
+            "mean": float(cv_scores.mean()),
+            "std": float(cv_scores.std()),
+            "scores": [float(s) for s in cv_scores],
+        },
+        "classification_report": report,
+    }
+    with open(METRICS_PATH, "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2, ensure_ascii=False)
+    logger.info(f"💾 Métricas salvas em: {METRICS_PATH}")
 
 
 if __name__ == "__main__":

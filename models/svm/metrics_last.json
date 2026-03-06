@@ -1,0 +1,32 @@
+{
+  "n_samples": 30,
+  "n_positives": 15,
+  "n_negatives": 15,
+  "n_features": 332,
+  "holdout": {
+    "precision_tampinha": 1.0,
+    "recall_tampinha": 1.0,
+    "confusion_matrix": [
+      [
+        3,
+        0
+      ],
+      [
+        0,
+        3
+      ]
+    ]
+  },
+  "cv_accuracy": {
+    "mean": 1.0,
+    "std": 0.0,
+    "scores": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "classification_report": "              precision    recall  f1-score   support\n\nnao_tampinha     1.0000    1.0000    1.0000         3\n    tampinha     1.0000    1.0000    1.0000         3\n\n    accuracy                         1.0000         6\n   macro avg     1.0000    1.0000    1.0000         6\nweighted avg     1.0000    1.0000    1.0000         6\n"
+}

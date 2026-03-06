@@ -132,6 +132,8 @@ plantuml totem_ia_diagram.puml
 5. **Feedback**: Interface mostra resultado + impacto ambiental
 6. **Armazenamento**: Dados salvos localmente e enviados para nuvem
 
+> **Documentação detalhada**: [docs/FLUXO_DADOS.md](docs/FLUXO_DADOS.md) — fluxo sensor → banco → análise → visualização
+
 ### Tecnologias Utilizadas
 
 #### Hardware
