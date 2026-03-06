@@ -18,12 +18,14 @@ pandas>=2.2.0
 # Visão Computacional
 opencv-python>=4.8.0
 pillow>=10.0.0
+scikit-image>=0.22.0
 
 # Machine Learning
 scikit-learn>=1.4.0
 scipy>=1.12.0
 joblib>=1.3.0
 matplotlib>=3.8.0
+seaborn>=0.13.0
 
 # Utilitários de IA
 openai==1.3.9

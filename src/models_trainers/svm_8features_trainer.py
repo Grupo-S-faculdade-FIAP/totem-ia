@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -8,7 +9,8 @@ from pathlib import Path
 import cv2
 import joblib
 import numpy as np
-from sklearn.metrics import confusion_matrix, precision_score, recall_score
+from skimage.feature import hog
+from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -21,6 +23,17 @@ logger = logging.getLogger(__name__)
 
 MODEL_PATH = Path("models/svm/svm_model_complete.pkl")
 SCALER_PATH = Path("models/svm/scaler_complete.pkl")
+METRICS_PATH = Path("models/svm/metrics_last.json")
+
+# ROI central: paridade com produção (image.py)
+ROI_CENTER_RATIO = 0.75
+USE_ROI = os.getenv("USE_ROI", "true").lower() in ("true", "1", "yes")
+
+# HOG: 64x64 grayscale, pixels_per_cell=(16,16) → 324 features
+HOG_ORIENTATIONS = 9
+HOG_PIXELS_PER_CELL = (16, 16)
+HOG_CELLS_PER_BLOCK = (2, 2)
+HOG_SIZE = (64, 64)  # resize gray para HOG (menor = menos features)
 
 POSITIVE_DIRS = [
     Path("datasets/field-real/positive"),
@@ -39,13 +52,24 @@ NEGATIVE_DIRS = [
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 
 
-def extract_8_features(image: np.ndarray | None) -> np.ndarray | None:
-    """Extrai o vetor de 8 features idêntico ao de produção (cor + saturação + contraste).
+def _crop_to_roi_center(image: np.ndarray) -> np.ndarray:
+    """Extrai região central (ROI) — paridade com image.py."""
+    if not USE_ROI:
+        return image
+    h, w = image.shape[:2]
+    size = int(min(h, w) * ROI_CENTER_RATIO)
+    if size < 32:
+        return image
+    x = (w - size) // 2
+    y = (h - size) // 2
+    return image[y : y + size, x : x + size].copy()
+
+
+def extract_features(image: np.ndarray | None) -> np.ndarray | None:
+    """Extrai vetor 8 (cor) + HOG — paridade com produção.
     
-    Vetor: [mean_B, std_B, median_B, mean_G, std_G, median_G, sat_mean, contrast]
-    
-    A validação de circularidade (CV pre-screening) é feita separadamente em produção
-    com cv2.Canny + cv2.findContours, NÃO entra no vetor SVM.
+    Vetor: [mean_B, std_B, median_B, mean_G, std_G, median_G, sat_mean, contrast] + HOG(324)
+    Total: 332 features.
     """
     if image is None or not isinstance(image, np.ndarray):
         return None
@@ -54,19 +78,31 @@ def extract_8_features(image: np.ndarray | None) -> np.ndarray | None:
     if image.dtype != np.uint8:
         image = image.astype(np.uint8)
 
+    image = _crop_to_roi_center(image)
     image = cv2.resize(image, (128, 128))
 
     b_channel, g_channel, _ = cv2.split(image)
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    features = np.array([
-        np.mean(b_channel), np.std(b_channel), np.median(b_channel),   # 0-2: canal B
-        np.mean(g_channel), np.std(g_channel), np.median(g_channel),   # 3-5: canal G
-        np.mean(hsv[:, :, 1]),                                          # 6: saturação HSV
-        np.std(gray),                                                   # 7: contraste
+    color_features = np.array([
+        np.mean(b_channel), np.std(b_channel), np.median(b_channel),
+        np.mean(g_channel), np.std(g_channel), np.median(g_channel),
+        np.mean(hsv[:, :, 1]),
+        np.std(gray),
     ], dtype=np.float64)
-    return features
+
+    gray_hog = cv2.resize(gray, HOG_SIZE)
+    hog_features = hog(
+        gray_hog,
+        orientations=HOG_ORIENTATIONS,
+        pixels_per_cell=HOG_PIXELS_PER_CELL,
+        cells_per_block=HOG_CELLS_PER_BLOCK,
+        visualize=False,
+        channel_axis=None,
+    ).astype(np.float64)
+
+    return np.concatenate([color_features, hog_features])
 
 
 def load_positive_features() -> list[np.ndarray]:
@@ -83,7 +119,7 @@ def load_positive_features() -> list[np.ndarray]:
 
         for file in tqdm(files, desc=f"Positivos {directory.name}", leave=False):
             image = cv2.imread(str(file))
-            features = extract_8_features(image)
+            features = extract_features(image)
             if features is not None and not np.isnan(features).any():
                 positive_features.append(features)
 
@@ -104,7 +140,7 @@ def load_negative_features() -> list[np.ndarray]:
 
         for file in tqdm(files, desc=f"Negativos {directory.name}", leave=False):
             image = cv2.imread(str(file))
-            features = extract_8_features(image)
+            features = extract_features(image)
             if features is not None and not np.isnan(features).any():
                 negative_features.append(features)
 
@@ -124,7 +160,7 @@ def generate_synthetic_negative_features(num_samples: int) -> list[np.ndarray]:
         hsv[:, :, 2] = rng.integers(30, 255, size=(128, 128), dtype=np.uint8)
         image = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
-        features = extract_8_features(image)
+        features = extract_features(image)
         if features is not None and not np.isnan(features).any():
             negatives.append(features)
 
@@ -132,8 +168,8 @@ def generate_synthetic_negative_features(num_samples: int) -> list[np.ndarray]:
 
 
 def train_and_save() -> None:
-    """Treina SVM com 8 features e salva modelo/scaler para produção."""
-    logger.info("🚀 Iniciando treinamento SVM (8 features)...")
+    """Treina SVM com 8 (cor) + HOG features e salva modelo/scaler para produção."""
+    logger.info("🚀 Iniciando treinamento SVM (8 cor + HOG)...")
 
     positives = load_positive_features()
     if not positives:
@@ -188,6 +224,14 @@ def train_and_save() -> None:
     logger.info(f"📊 Validação holdout | precision_tampinha={precision:.4f} recall_tampinha={recall:.4f}")
     logger.info(f"📊 Matriz de confusão [linhas=real 0/1, colunas=pred 0/1]: {cm.tolist()}")
 
+    report = classification_report(
+        y_val, y_val_pred,
+        target_names=["nao_tampinha", "tampinha"],
+        digits=4,
+        zero_division=0,
+    )
+    logger.info("📊 Classification Report (holdout):\n" + report)
+
     # Refit final com dataset completo para persistência do artefato
     x_scaled_full = scaler.fit_transform(x)
     model.fit(x_scaled_full, y)
@@ -206,6 +250,28 @@ def train_and_save() -> None:
     joblib.dump(scaler, SCALER_PATH)
     logger.info(f"💾 Modelo salvo em: {MODEL_PATH}")
     logger.info(f"💾 Scaler salvo em: {SCALER_PATH}")
+
+    # Persistir métricas em JSON para evidência e auditoria
+    metrics = {
+        "n_samples": len(x),
+        "n_positives": len(positives),
+        "n_negatives": len(negatives),
+        "n_features": x.shape[1],
+        "holdout": {
+            "precision_tampinha": float(precision),
+            "recall_tampinha": float(recall),
+            "confusion_matrix": cm.tolist(),
+        },
+        "cv_accuracy": {
+            "mean": float(cv_scores.mean()),
+            "std": float(cv_scores.std()),
+            "scores": [float(s) for s in cv_scores],
+        },
+        "classification_report": report,
+    }
+    with open(METRICS_PATH, "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2, ensure_ascii=False)
+    logger.info(f"💾 Métricas salvas em: {METRICS_PATH}")
 
 
 if __name__ == "__main__":

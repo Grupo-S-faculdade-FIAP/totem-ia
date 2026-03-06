@@ -140,13 +140,59 @@ def _get_fallback_response(endpoint: str) -> dict:
     return fallbacks.get(endpoint, {})
 
 
+# Faixas válidas para validação de sensores
+PESO_MIN_VALIDO = 0
+PESO_MAX_VALIDO = 10000  # gramas
+TEMP_MIN_VALIDO = -20
+TEMP_MAX_VALIDO = 80
+
+
+def _validate_sensors_response(data: dict | None) -> dict | None:
+    """Valida e sanitiza resposta dos sensores (tipos e faixas)."""
+    if not data or not isinstance(data, dict):
+        return None
+    presenca = data.get('presenca', True)
+    peso_raw = data.get('peso', 2600)
+    temp_raw = data.get('temperatura', 25.0)
+
+    # presenca: deve ser booleano
+    if not isinstance(presenca, bool):
+        presenca = bool(presenca) if presenca is not None else True
+        logger.warning(f"⚠️ ESP32: presenca não booleana, convertido para {presenca}")
+
+    # peso: numérico, faixa válida
+    try:
+        peso = int(float(peso_raw)) if peso_raw is not None else 2600
+    except (TypeError, ValueError):
+        peso = 2600
+        logger.warning("⚠️ ESP32: peso inválido, usando fallback 2600")
+    if peso < PESO_MIN_VALIDO or peso > PESO_MAX_VALIDO:
+        logger.warning(f"⚠️ ESP32: peso {peso}g fora da faixa [{PESO_MIN_VALIDO}, {PESO_MAX_VALIDO}], usando 2600")
+        peso = 2600
+
+    # temperatura: numérico, faixa razoável
+    try:
+        temp = float(temp_raw) if temp_raw is not None else 25.0
+    except (TypeError, ValueError):
+        temp = 25.0
+    if temp < TEMP_MIN_VALIDO or temp > TEMP_MAX_VALIDO:
+        logger.warning(f"⚠️ ESP32: temperatura {temp}°C fora da faixa, usando 25.0")
+        temp = 25.0
+
+    return {'presenca': presenca, 'peso': peso, 'temperatura': temp}
+
+
 def get_esp32_sensors() -> dict | None:
-    """Obtém leitura dos sensores do ESP32"""
+    """Obtém leitura dos sensores do ESP32 (com validação de tipos e faixas)."""
     logger.info("🔌 ESP32: Lendo sensores...")
     result = call_esp32_api('/api/sensors', 'GET')
     if result:
-        logger.info(f"✅ ESP32 Sensores: Presença={result.get('presenca')}, Peso={result.get('peso')}, Temp={result.get('temperatura')}")
-    return result
+        validated = _validate_sensors_response(result)
+        if validated:
+            logger.info(f"✅ ESP32 Sensores: Presença={validated.get('presenca')}, Peso={validated.get('peso')}g, Temp={validated.get('temperatura')}")
+            return validated
+        return _get_fallback_response('/api/sensors')
+    return None
 
 
 def confirm_esp32_detection(detection_type: str, confidence: float) -> dict | None:

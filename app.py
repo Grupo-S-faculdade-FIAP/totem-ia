@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 # Importar agents e prompts
 # from prompts.agents_config import get_agent
 
-from src.modules.image import ImageClassifier, SAT_LOW_THRESHOLD, SAT_VERY_LOW_THRESHOLD
+from src.modules.image import ImageClassifier
 from src.modules.sprint3_analytics import build_analytics_report, build_daily_trend, is_admin_authenticated
 
 from src.hardware.esp32 import ESP32_API_URL, get_esp32_sensors, calculate_environmental_impact, check_esp32_mechanical, confirm_esp32_detection
@@ -432,12 +432,30 @@ def api_validate_complete():
             }), 500
 
         is_tampinha = pred == 1
-        borderline_low_sat = (
-            not is_tampinha
-            and sat is not None
-            and SAT_VERY_LOW_THRESHOLD <= float(sat) < SAT_LOW_THRESHOLD
-        )
-        if not is_tampinha and not borderline_low_sat:
+
+        # Métricas CV para debug (visíveis no console do browser) — valores JSON-serializáveis
+        def _safe_cv(v, default=0, decimals=3):
+            if isinstance(v, (int, float)):
+                return round(float(v), decimals) if decimals else int(v)
+            try:
+                return round(float(v), decimals) if v is not None else default
+            except (TypeError, ValueError):
+                return default
+
+        cv_debug = {}
+        if classifier:
+            cv_debug = {
+                'hough': _safe_cv(getattr(classifier, '_last_hough_count', 0), 0, 0),
+                'hough_consistent': getattr(classifier, '_last_hough_consistent', False) is True,
+                'circularity': _safe_cv(getattr(classifier, '_last_circularity', 0), 0),
+                'aspect_ratio': _safe_cv(getattr(classifier, '_last_aspect_ratio', 0), 0),
+                'ellipse_aspect': _safe_cv(getattr(classifier, '_last_ellipse_aspect', 0), 0),
+                'contour_area': _safe_cv(getattr(classifier, '_last_contour_area', 0), 0, 1),
+            }
+        logger.info(f"🔬 CV Debug: {cv_debug}")
+
+        # Rejeitar sempre que pred=0 (CV ou SVM rejeitou). Não há bypass por saturação.
+        if not is_tampinha:
             if db_connection:
                 with db_connection as db:
                     db.save_interaction(DatabaseConnection.ResultadoInteracao.REJEITADO)
@@ -454,14 +472,9 @@ def api_validate_complete():
                 'confidence': float(conf) if conf is not None else None,
                 'saturation': float(sat) if sat is not None else None,
                 'method': method,
+                'cv_debug': cv_debug,
                 'timestamp': datetime.now().isoformat()
             }), 200
-
-        if borderline_low_sat:
-            logger.warning(
-                "⚠️ Classificação limítrofe em baixa saturação; prosseguindo para validação mecânica "
-                f"(sat={sat:.1f}, conf={conf:.2f})"
-            )
 
         logger.info(f"✅ Classificação OK: TAMPINHA (conf: {conf:.2f})")
 
@@ -475,11 +488,8 @@ def api_validate_complete():
                     'is_tampinha': True,
                     'confidence': float(conf) if conf is not None else None,
                     'saturation': float(sat) if sat is not None else None,
-                    'method': method
-                },
-                'mecanica': {
-                    'status': 'pendente',
-                    'message': 'Validando ESP32 em background...'
+                    'method': method,
+                    'cv_debug': cv_debug,
                 }
             },
             'timestamp': datetime.now().isoformat()
@@ -499,9 +509,11 @@ def api_validate_complete():
                 esp32_status['message'] = f"📊 Sensores recebidos: {sensors}"
                 
                 presenca = sensors.get('presenca', True) if sensors else True
-                peso = sensors.get('peso', 2600) if sensors else 2600
+                peso_raw = sensors.get('peso', 2600) if sensors else 2600
+                peso = int(peso_raw) if isinstance(peso_raw, (int, float)) else 2600
+                weight_ok = PESO_MIN_TAMPINHA <= peso <= PESO_MAX_TAMPINHA
                 
-                logger.info(f"📊 [Background] Valores extraídos: presença={presenca}, peso={peso}g")
+                logger.info(f"📊 [Background] Valores extraídos: presença={presenca}, peso={peso}g, weight_ok={weight_ok}")
                 esp32_status['message'] = f"✓ Presença={presenca}, Peso={peso}g"
                 
                 # Chamar validação mecânica
@@ -520,10 +532,14 @@ def api_validate_complete():
                 logger.info(f"✔️  [Background] Confirmação de detecção: {detection_confirm}")
                 esp32_status['message'] += " | ✓ Detecção confirmada"
                 
+                # Obter plastico_reciclado_g (impacto ambiental)
+                impact = calculate_environmental_impact()
+                plastico_reciclado_g = float(impact.get('plastico_reciclado_g', 0.5))
+                
                 # Salvar no banco de dados
                 if db_connection:
                     with db_connection as db:
-                        deposit_id = db.save_deposit_data(conf, True, True, peso, True)
+                        deposit_id = db.save_deposit_data(conf, bool(presenca), weight_ok, peso, plastico_reciclado_g)
                         logger.info(f"💾 [Background] Depósito salvo no BD com ID: {deposit_id}")
                         esp32_status['message'] += f" | 💾 Depósito #{deposit_id}"
                         

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import logging
+import os
 import traceback
 
 import cv2  # pyright: ignore[reportMissingImports]
 # import requests 
 import joblib  # pyright: ignore[reportMissingImports]
 from pathlib import Path
+from skimage.feature import hog  # pyright: ignore[reportMissingImports]
 
 import numpy as np  # pyright: ignore[reportMissingImports]
 
@@ -23,19 +25,54 @@ SAT_LOW_THRESHOLD       =  50  # sat < 50  → LOW_SAT_FORCE_TAMPINHA
 SAT_VERY_LOW_THRESHOLD  =  30  # sat < 30  → SAT_VERY_LOW (não-tampinha)
 SVM_MIN_MARGIN          =  0.50  # |decision_function| mínimo calibrado para reduzir FN sem aumentar FP
 SVM_MIN_MARGIN_HIGH_SAT =  0.80  # margem para SAT_HIGH calibrada por benchmark balanceado
+SVM_SOFT_THRESHOLD      = -0.50  # decision_function > -0.5 → aceita (sem pista CV)
+SVM_SOFT_THRESHOLD_HOUGH = -1.00  # quando Hough+contorno consistentes: aceita até conf > -1.0
 
 # =============================================================================
 # Validações de Visão Computacional (CV pre-screening)
 # =============================================================================
-CV_MIN_CIRCULARITY      = 0.72  # Tampinha real: 0.80-0.95 | Rosto: 0.50-0.70 | invariante a escala
-CV_MIN_ASPECT_RATIO     = 0.82  # Bounding box da tampinha ≈ quadrado (w/h ≈ 1.0) | Rosto: 0.60-0.78
-CV_MIN_CONTOUR_AREA     = 150   # pixels² em 128×128 (≈ r≥7px) — filtra olhos/botões pequenos
+CV_MIN_CIRCULARITY      = 0.78  # Tampinha: 0.90-0.98 | Rosto: 0.70-0.85 (bem relaxado)
+CV_MIN_ASPECT_RATIO     = 0.78  # Bounding box ≈ quadrado | Rosto: 0.60-0.80
+CV_MIN_ELLIPSE_ASPECT   = 0.78  # Elipse: tampinha≈1.0, rosto≈0.65-0.80
+CV_MIN_CONTOUR_AREA     = 150   # pixels² — filtra olhos/botões pequenos
+CV_MAX_CONTOUR_AREA     = 8500  # pixels² — rosto ≈ 9000-12000, tampinha r=50 ≈ 8300
 
 # =============================================================================
 # Seção 6 (ml-conventions): Caminhos de modelo — constantes, nunca inline
 # =============================================================================
 MODEL_PATH  = Path('models/svm/svm_model_complete.pkl')
 SCALER_PATH = Path('models/svm/scaler_complete.pkl')
+
+# ROI central: classifica apenas a area do circulo de verificacao (como bancos)
+# 0.75 = 75% do centro - area maior para capturar tampinha inteira
+ROI_CENTER_RATIO = 0.75
+
+# HOG: paridade com trainer (8 cor + 324 HOG = 332 features)
+HOG_ORIENTATIONS = 9
+HOG_PIXELS_PER_CELL = (16, 16)
+HOG_CELLS_PER_BLOCK = (2, 2)
+HOG_SIZE = (64, 64)
+# USE_ROI=false desativa o crop para teste (ver se aceitação melhora sem ROI)
+USE_ROI = os.getenv("USE_ROI", "true").lower() in ("true", "1", "yes")
+
+# Haar cascade para pré-filtro de rosto (rejeita antes do SVM)
+_FACE_CASCADE: cv2.CascadeClassifier | None = None
+
+
+def _get_face_cascade() -> cv2.CascadeClassifier | None:
+    """Carrega Haar cascade de rosto uma vez (lazy)."""
+    global _FACE_CASCADE
+    if _FACE_CASCADE is None:
+        try:
+            path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+            _FACE_CASCADE = cv2.CascadeClassifier(path)
+            if _FACE_CASCADE.empty():
+                logger.warning("⚠️ Haar cascade de rosto não carregou")
+                _FACE_CASCADE = None
+        except Exception as e:
+            logger.warning(f"⚠️ Erro ao carregar face cascade: {e}")
+            _FACE_CASCADE = None
+    return _FACE_CASCADE
 
 
 class ImageClassifier:
@@ -45,6 +82,7 @@ class ImageClassifier:
         self._last_circularity = 0.0
         self._last_contour_count = 0.0
         self._last_aspect_ratio = 0.0
+        self._last_ellipse_aspect = 0.0
         self._last_contour_area = 0.0
         self._last_hough_count = 0
         self._last_hough_consistent = False
@@ -72,6 +110,15 @@ class ImageClassifier:
             self.model = None
             self.scaler = None
 
+    def _crop_to_roi_center(self, image: np.ndarray) -> np.ndarray:
+        """Extrai regiao central (ROI) - area do circulo de verificacao. Ignora bordas."""
+        h, w = image.shape[:2]
+        size = int(min(h, w) * ROI_CENTER_RATIO)
+        if size < 32:
+            return image
+        x = (w - size) // 2
+        y = (h - size) // 2
+        return image[y : y + size, x : x + size].copy()
 
     def extract_color_features(self, image: np.ndarray) -> np.ndarray | None:
         try:
@@ -119,6 +166,21 @@ class ImageClassifier:
             contrast = np.std(gray)
             features.append(contrast)
 
+            # HOG: features de forma (tampinha circular vs rosto oval)
+            # Só inclui se o modelo esperar 332 features (8+HOG); modelo legado usa 8
+            expected_n = getattr(self.scaler, "n_features_in_", None) if self.scaler is not None else 332
+            if expected_n != 8:
+                gray_hog = cv2.resize(gray, HOG_SIZE)
+                hog_feats = hog(
+                    gray_hog,
+                    orientations=HOG_ORIENTATIONS,
+                    pixels_per_cell=HOG_PIXELS_PER_CELL,
+                    cells_per_block=HOG_CELLS_PER_BLOCK,
+                    visualize=False,
+                    channel_axis=None,
+                )
+                features.extend(hog_feats.astype(float).tolist())
+
             # CV metrics para pre-screening — não entram no vetor SVM
             blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
@@ -129,6 +191,7 @@ class ImageClassifier:
 
             circularity = 0.0
             aspect_ratio = 0.0
+            ellipse_aspect = 0.0
             contour_area = 0.0
             if contours:
                 largest = max(contours, key=cv2.contourArea)
@@ -137,6 +200,13 @@ class ImageClassifier:
                 circularity = (4 * np.pi * contour_area / (perim ** 2)) if perim > 0 else 0.0
                 x, y, w, h = cv2.boundingRect(largest)
                 aspect_ratio = float(min(w, h)) / float(max(w, h)) if max(w, h) > 0 else 0.0
+                # Elipse ajustada: rosto é alongado (ellipse_aspect ~0.65), tampinha é redonda (~1.0)
+                if len(largest) >= 5:
+                    try:
+                        (_, _), (ma, mb), _ = cv2.fitEllipse(largest)
+                        ellipse_aspect = float(min(ma, mb)) / float(max(ma, mb)) if max(ma, mb) > 0 else 0.0
+                    except cv2.error:
+                        ellipse_aspect = aspect_ratio
 
             # HoughCircles: detecta círculos com borda bem definida (aro da tampinha).
             # param2=28 exige borda circular forte.
@@ -144,7 +214,7 @@ class ImageClassifier:
                 blurred, cv2.HOUGH_GRADIENT,
                 dp=1.2, minDist=30,
                 param1=60, param2=28,
-                minRadius=8, maxRadius=60
+                minRadius=15, maxRadius=45
             )
 
             # Valida consistência Hough × contorno:
@@ -167,12 +237,13 @@ class ImageClassifier:
             self._last_circularity = float(circularity)
             self._last_contour_count = contour_count
             self._last_aspect_ratio = float(aspect_ratio)
+            self._last_ellipse_aspect = float(ellipse_aspect)
             self._last_contour_area = float(contour_area)
             self._last_hough_count = hough_count
             self._last_hough_consistent = hough_contour_consistent
 
-            # Não incluir features de borda no output (modelo foi treinado com 8 features apenas)
-            return np.array(features[:8])
+            # Vetor: 8 cor (+ HOG se modelo novo)
+            return np.array(features, dtype=np.float64)
         except Exception as e:
             logger.error(f"Erro ao extrair features: {e}")
             return None
@@ -186,8 +257,16 @@ class ImageClassifier:
         try:
             logger.info(f"📸 Iniciando classificação. Imagem shape: {image.shape if image is not None else 'None'}")
 
+            # ROI: classificar apenas area central (circulo de verificacao, como bancos)
+            # USE_ROI=false usa imagem inteira para teste (Opção 2 do plano)
+            image_for_features = self._crop_to_roi_center(image) if USE_ROI else image
+            if USE_ROI:
+                logger.info(f"📐 ROI central: {image_for_features.shape[1]}x{image_for_features.shape[0]} (ratio={ROI_CENTER_RATIO})")
+            else:
+                logger.info("📐 ROI desativado (USE_ROI=false) — usando imagem inteira")
+
             # Features e saturação calculados em uma única passagem (sem conversão HSV dupla)
-            features = self.extract_color_features(image)
+            features = self.extract_color_features(image_for_features)
             if features is None or np.isnan(features).any():
                 logger.error("❌ Erro ao extrair features")
                 return None, None, None, "ERRO"
@@ -199,12 +278,25 @@ class ImageClassifier:
             hough_count = self._last_hough_count
             hough_consistent = self._last_hough_consistent
             contour_area = self._last_contour_area
+            ellipse_aspect = self._last_ellipse_aspect
 
             logger.info(f"✅ Features extraídas. Shape: {features.shape}, Saturação: {saturation:.1f}")
             logger.info(
                 f"🔍 CV Metrics: hough={hough_count}, circ={circularity:.2f}, "
                 f"aspect={aspect_ratio:.2f}, contornos={contour_count:.0f}"
             )
+
+            # ========== PRÉ-FILTRO: DETECÇÃO DE ROSTO ==========
+            # Rejeita imediatamente se rosto detectado (evita aceitar rosto como tampinha)
+            face_cascade = _get_face_cascade()
+            if face_cascade is not None:
+                gray_roi = cv2.cvtColor(image_for_features, cv2.COLOR_BGR2GRAY)
+                faces = face_cascade.detectMultiScale(
+                    gray_roi, scaleFactor=1.1, minNeighbors=5, minSize=(50, 50)
+                )
+                if len(faces) > 0:
+                    logger.info(f"🚫 Rosto detectado ({len(faces)} região(ões)) → REJEITAR")
+                    return 0, 0.95, saturation, "FACE_DETECTED"
 
             # ========== PRÉ-SCREENING: VALIDAÇÃO CV ==========
             # Estratégia em cascata:
@@ -216,15 +308,24 @@ class ImageClassifier:
             elif contour_count > 0:
                 is_circular = circularity >= CV_MIN_CIRCULARITY
                 is_square_bbox = aspect_ratio >= CV_MIN_ASPECT_RATIO
-                if not is_circular or not is_square_bbox:
+                is_round_ellipse = ellipse_aspect >= CV_MIN_ELLIPSE_ASPECT or ellipse_aspect == 0
+                is_size_ok = CV_MIN_CONTOUR_AREA <= contour_area <= CV_MAX_CONTOUR_AREA
+                if not is_circular or not is_square_bbox or not is_round_ellipse or not is_size_ok:
                     reason = []
                     if not is_circular:
                         reason.append(f"circ={circularity:.2f}<{CV_MIN_CIRCULARITY}")
                     if not is_square_bbox:
                         reason.append(f"aspect={aspect_ratio:.2f}<{CV_MIN_ASPECT_RATIO}")
+                    if not is_round_ellipse and ellipse_aspect > 0:
+                        reason.append(f"ellipse={ellipse_aspect:.2f}<{CV_MIN_ELLIPSE_ASPECT}")
+                    if not is_size_ok:
+                        if contour_area > CV_MAX_CONTOUR_AREA:
+                            reason.append(f"area={contour_area:.0f}>{CV_MAX_CONTOUR_AREA}(face?)")
+                        else:
+                            reason.append(f"area={contour_area:.0f}<{CV_MIN_CONTOUR_AREA}")
                     logger.warning(f"❌ CV Rejection: {', '.join(reason)}")
                     return 0, 0.90, saturation, f"CV_REJECT ({', '.join(reason)})"
-                logger.info(f"✅ CV: contorno circular (circ={circularity:.2f}, aspect={aspect_ratio:.2f})")
+                logger.info(f"✅ CV: contorno circular (circ={circularity:.2f}, aspect={aspect_ratio:.2f}, ellipse={ellipse_aspect:.2f}, area={contour_area:.0f})")
             else:
                 logger.info("⚠️ CV: sem contornos detectados — SVM vai decidir")
 
@@ -237,26 +338,24 @@ class ImageClassifier:
             svm_margin = abs(float(svm_conf))
 
             # cv_confirmed_circle: CV confirma com SEGURANÇA que o objeto é circular.
-            # Exige que Hough E contorno concordem — evita aceitar rostos ou olhos.
-            #
-            # Hough detecta olho pequeno (r~8) mas contorno é o rosto inteiro (área enorme)
-            # → hough_consistent=False → rejeitado.
-            #
-            # Tampinha: Hough detecta o aro (r~20-55), contorno = a própria tampinha
-            # → areas compatíveis → hough_consistent=True → aceito.
+            # OBRIGATÓRIO: contour_count > 0 — sem contorno detectado NUNCA aceitar.
+            # (Hough sozinho aceita óculos/íris no rosto; contorno valida o objeto inteiro)
+            area_ok = CV_MIN_CONTOUR_AREA <= contour_area <= CV_MAX_CONTOUR_AREA
+            shape_ok = (
+                circularity >= CV_MIN_CIRCULARITY
+                and aspect_ratio >= CV_MIN_ASPECT_RATIO
+                and (ellipse_aspect >= CV_MIN_ELLIPSE_ASPECT or ellipse_aspect == 0)
+                and area_ok
+            )
             hough_with_valid_shape = (
-                hough_count > 0
+                contour_count > 0
+                and hough_count > 0
                 and hough_consistent
-                and (
-                    contour_count == 0
-                    or (circularity >= CV_MIN_CIRCULARITY and aspect_ratio >= CV_MIN_ASPECT_RATIO)
-                )
+                and shape_ok
             )
             contour_circular = (
                 contour_count > 0
-                and circularity >= CV_MIN_CIRCULARITY
-                and aspect_ratio >= CV_MIN_ASPECT_RATIO
-                and contour_area >= CV_MIN_CONTOUR_AREA  # filtra olhos/botões pequenos
+                and shape_ok
             )
             cv_confirmed_circle = hough_with_valid_shape or contour_circular
 
@@ -276,33 +375,22 @@ class ImageClassifier:
             # ────────────────────────────────────────────────────────────────
 
             if cv_confirmed_circle and saturation >= SAT_VERY_LOW_THRESHOLD:
-                # CV confirmou círculo via HoughCircles/contorno + saturação mínima.
-                # O SVM é ignorado aqui porque foi treinado em imagens de dataset e sofre
-                # training-serving skew quando aplicado a frames de câmera com fundo variável.
-                # A forma circular (HoughCircles) é critério mais confiável neste cenário.
-                logger.info(f"✅ CV confirmou círculo + sat≥{SAT_VERY_LOW_THRESHOLD} → TAMPINHA (CV é autoridade)")
+                logger.info(f"✅ CV confirmou círculo → TAMPINHA")
                 return 1, 0.85, saturation, "CV_CIRCLE_CONFIRMED"
 
-            # Sem confirmação CV → SVM decide com margens calibradas
-            if saturation > SAT_HIGH_THRESHOLD:
-                if svm_pred == 1 and svm_margin >= SVM_MIN_MARGIN_HIGH_SAT:
-                    return 1, 0.90, saturation, "SAT_HIGH"
-                return 0, 0.90, saturation, "SAT_HIGH"
-            elif saturation < SAT_VERY_LOW_THRESHOLD:
-                return 0, 0.95, saturation, "SAT_VERY_LOW"
-            else:
-                if saturation > SAT_MID_UPPER_THRESHOLD:
-                    if svm_pred == 1 and svm_margin >= SVM_MIN_MARGIN:
-                        return 1, 0.75, saturation, "MID_HIGH_SAT"
-                    return 0, 0.70, saturation, "ACCEPT_MID_SAT"
-                elif saturation < SAT_LOW_THRESHOLD:
-                    if svm_pred == 1 and svm_margin >= 1.2:
-                        return 1, 0.65, saturation, "LOW_SAT_FORCE_TAMPINHA"
-                    return 0, 0.70, saturation, "LOW_SAT_FORCE_TAMPINHA"
-                else:
-                    if svm_pred == 1 and svm_margin >= SVM_MIN_MARGIN:
-                        return 1, 0.80, saturation, "NORMAL_SAT_TAMPINHA"
-                    return 0, 0.80, saturation, "NORMAL_SAT_TAMPINHA"
+            # SVM decide: threshold mais suave só quando Hough+contorno consistentes
+            threshold = (
+                SVM_SOFT_THRESHOLD_HOUGH
+                if (hough_count > 0 and hough_consistent)
+                else SVM_SOFT_THRESHOLD
+            )
+            svm_accept = svm_conf > threshold
+            if svm_accept and saturation >= SAT_VERY_LOW_THRESHOLD:
+                logger.info(f"✅ SVM aceita (conf={svm_conf:.2f}, threshold={threshold}, hough={hough_count})")
+                return 1, 0.78, saturation, "SVM_ACCEPT"
+
+            logger.info(f"❌ Rejeitado (conf={svm_conf:.2f}, pred={svm_pred}, threshold={threshold})")
+            return 0, 0.90, saturation, "CV_NO_CIRCLE"
 
         except Exception as e:
             logger.error(f"Erro na classificação: {e}")
