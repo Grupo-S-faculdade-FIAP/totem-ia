@@ -417,6 +417,183 @@
             color: #999;
             font-size: 12px;
         }
+
+        /* RELATORIO */
+        .report-section {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-top: 30px;
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .report-header h2 {
+            font-size: 22px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .report-header h2 i { color: #667eea; }
+
+        .report-meta {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        .btn-print {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-print:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102,126,234,0.35);
+        }
+
+        .report-kpis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .report-kpi-item {
+            background: linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.06));
+            border: 1px solid rgba(102,126,234,0.15);
+            border-radius: 10px;
+            padding: 18px 15px;
+            text-align: center;
+        }
+
+        .report-kpi-item .r-label {
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .report-kpi-item .r-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .report-kpi-item .r-unit {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 4px;
+        }
+
+        .report-block {
+            margin-bottom: 28px;
+        }
+
+        .report-block h4 {
+            font-size: 15px;
+            color: #555;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .report-block h4 i { color: #667eea; font-size: 14px; }
+
+        .report-interpretation {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            border-radius: 0 8px 8px 0;
+            padding: 18px 20px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #444;
+        }
+
+        .report-interpretation p { margin-bottom: 8px; }
+        .report-interpretation p:last-child { margin-bottom: 0; }
+
+        .report-dist-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .report-dist-table th {
+            background: #f5f5f5;
+            padding: 10px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .report-dist-table td {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            color: #444;
+        }
+
+        .report-dist-table tr:last-child td { border-bottom: none; }
+
+        .report-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .report-badge.sucesso { background: #e8f5e9; color: #2e7d32; }
+        .report-badge.erro { background: #fce4ec; color: #c62828; }
+        .report-badge.rejeitado { background: #fff3e0; color: #e65100; }
+        .report-badge.outro { background: #ede7f6; color: #4527a0; }
+
+        .report-conclusion {
+            background: linear-gradient(135deg, rgba(76,175,80,0.08), rgba(76,175,80,0.03));
+            border: 1px solid rgba(76,175,80,0.2);
+            border-radius: 10px;
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #2e7d32;
+        }
+
+        .report-loading {
+            text-align: center;
+            padding: 40px;
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .header, .grid, .charts-section, .table-section, .stats-grid, .footer, .btn-print { display: none !important; }
+            .report-section { box-shadow: none; margin: 0; }
+        }
     </style>
 </head>
 
@@ -566,6 +743,22 @@
             </div>
         </div>
 
+        <!-- RELATORIO -->
+        <div class="report-section" id="reportSection">
+            <div class="report-header">
+                <div>
+                    <h2><i class="fas fa-file-alt"></i> Relatório Analítico</h2>
+                    <div class="report-meta" id="reportMeta">Carregando dados...</div>
+                </div>
+                <button class="btn-print" onclick="window.print()">
+                    <i class="fas fa-print"></i> Imprimir Relatório
+                </button>
+            </div>
+            <div id="reportBody">
+                <div class="report-loading"><div class="spinner" style="margin:0 auto 15px"></div>Carregando relatório...</div>
+            </div>
+        </div>
+
         <!-- FOOTER -->
         <div class="footer">
             <i class="fas fa-info-circle"></i>
@@ -579,7 +772,8 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             loadDashboard();
-            setInterval(loadDashboard, 90000);
+            loadReport();
+            setInterval(() => { loadDashboard(); loadReport(); }, 90000);
         });
 
         async function loadDashboard() {
@@ -794,6 +988,141 @@
         function viewDetails(depositId) {
             alert(`Visualizando detalhes do depósito #${depositId}`);
             // Implementar visualização de detalhes
+        }
+
+        async function loadReport() {
+            try {
+                const token = localStorage.getItem('admin_token');
+                if (!token) return;
+
+                const response = await fetch('/api/admin/analytics-report', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) return;
+
+                const r = data.report;
+                const kpis = r.kpis;
+                const trend = r.trend_7d;
+                const dist = r.interaction_results || {};
+                const genAt = new Date(r.generated_at).toLocaleString('pt-BR');
+
+                document.getElementById('reportMeta').textContent = `Gerado em: ${genAt}`;
+
+                // --- Taxa de aceite como texto interpretado ---
+                const taxa = kpis.acceptance_rate_percent;
+                const conf = (kpis.avg_ml_confidence * 100).toFixed(1);
+                const peso = kpis.avg_weight_grams ? kpis.avg_weight_grams.toFixed(0) : '-';
+                const reciclado = kpis.total_recycled_kg;
+                const total = kpis.total_interactions;
+                const aceitas = kpis.accepted_deposits;
+                const rejeitadas = kpis.rejected_or_failed;
+
+                const trendPeak = trend.values ? Math.max(...trend.values) : 0;
+                const trendPeakDay = trend.labels ? trend.labels[trend.values.indexOf(trendPeak)] : '-';
+                const trendTotal = trend.values ? trend.values.reduce((a,b)=>a+b,0) : 0;
+
+                let taxaInterpretacao = taxa >= 80
+                    ? `A taxa de aceite de <strong>${taxa}%</strong> é excellent, indicando alta assertividade do modelo de classificação.`
+                    : taxa >= 60
+                    ? `A taxa de aceite de <strong>${taxa}%</strong> é satisfatória, com espaço para ajuste nos limiares de classificação.`
+                    : `A taxa de aceite de <strong>${taxa}%</strong> está abaixo do esperado, recomenda-se revisão dos parâmetros do modelo SVM.`;
+
+                let confInterpretacao = kpis.avg_ml_confidence >= 0.85
+                    ? `A confiança média do modelo (<strong>${conf}%</strong>) demonstra alta certeza nas predições.`
+                    : `A confiança média do modelo (<strong>${conf}%</strong>) indica incerteza em parte das classificações.`;
+
+                let impactoInterpretacao = reciclado > 0
+                    ? `O sistema contabilizou <strong>${reciclado} kg</strong> de plástico reciclado, gerando impacto ambiental positivo.`
+                    : `Nenhum plástico reciclado contabilizado ainda. Dados serão acumulados conforme uso do totem.`;
+
+                let trendInterpretacao = trendTotal > 0
+                    ? `Nos últimos 7 dias foram registrados <strong>${trendTotal} depósito(s)</strong>. Pico de atividade em <strong>${trendPeakDay}</strong> com ${trendPeak} depósito(s).`
+                    : `Sem depósitos nos últimos 7 dias. Verifique se o totem está operacional.`;
+
+                // --- Tabela de distribuição ---
+                let distRows = '';
+                const badgeClass = { sucesso: 'sucesso', erro_classificacao: 'erro', erro_mecanica: 'erro', rejeitado: 'rejeitado' };
+                for (const [key, val] of Object.entries(dist)) {
+                    const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+                    const cls = badgeClass[key] || 'outro';
+                    const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                    distRows += `<tr>
+                        <td><span class="report-badge ${cls}">${label}</span></td>
+                        <td><strong>${val}</strong></td>
+                        <td>${pct}%</td>
+                    </tr>`;
+                }
+                if (!distRows) distRows = '<tr><td colspan="3" style="text-align:center;color:#aaa">Sem dados de interação</td></tr>';
+
+                // --- Conclusão ---
+                let conclusao = '';
+                if (total === 0) {
+                    conclusao = 'O sistema ainda não possui depósitos registrados. Inicie a operação do totem para gerar análises.';
+                } else {
+                    conclusao = `O sistema processou <strong>${total} interação(ões)</strong> no total, aceitando <strong>${aceitas}</strong> e rejeitando <strong>${rejeitadas}</strong> tampinhas. `;
+                    conclusao += `O impacto ambiental acumulado é de <strong>${reciclado} kg</strong> de plástico reciclado. `;
+                    conclusao += taxa >= 70
+                        ? `A solução demonstra maturidade técnica com alta precisão na classificação por visão computacional.`
+                        : `Recomenda-se ajuste fino dos parâmetros do modelo para aumentar a taxa de aceite.`;
+                }
+
+                document.getElementById('reportBody').innerHTML = `
+                    <div class="report-kpis">
+                        <div class="report-kpi-item">
+                            <div class="r-label">Total de Interações</div>
+                            <div class="r-value">${total}</div>
+                            <div class="r-unit">registros</div>
+                        </div>
+                        <div class="report-kpi-item">
+                            <div class="r-label">Taxa de Aceite</div>
+                            <div class="r-value">${taxa}%</div>
+                            <div class="r-unit">tampinhas aceitas</div>
+                        </div>
+                        <div class="report-kpi-item">
+                            <div class="r-label">Confiança Média ML</div>
+                            <div class="r-value">${conf}%</div>
+                            <div class="r-unit">precisão do modelo</div>
+                        </div>
+                        <div class="report-kpi-item">
+                            <div class="r-label">Peso Médio</div>
+                            <div class="r-value">${peso}</div>
+                            <div class="r-unit">gramas por tampinha</div>
+                        </div>
+                        <div class="report-kpi-item">
+                            <div class="r-label">Plástico Reciclado</div>
+                            <div class="r-value">${reciclado}</div>
+                            <div class="r-unit">kg acumulados</div>
+                        </div>
+                    </div>
+
+                    <div class="report-block">
+                        <h4><i class="fas fa-comment-dots"></i> Interpretação dos Resultados</h4>
+                        <div class="report-interpretation">
+                            <p>${taxaInterpretacao}</p>
+                            <p>${confInterpretacao}</p>
+                            <p>${trendInterpretacao}</p>
+                            <p>${impactoInterpretacao}</p>
+                        </div>
+                    </div>
+
+                    <div class="report-block">
+                        <h4><i class="fas fa-table"></i> Distribuição de Resultados das Interações</h4>
+                        <table class="report-dist-table">
+                            <thead><tr><th>Resultado</th><th>Quantidade</th><th>Percentual</th></tr></thead>
+                            <tbody>${distRows}</tbody>
+                        </table>
+                    </div>
+
+                    <div class="report-block">
+                        <h4><i class="fas fa-flag-checkered"></i> Conclusão e Recomendações</h4>
+                        <div class="report-conclusion">${conclusao}</div>
+                    </div>
+                `;
+            } catch (err) {
+                document.getElementById('reportBody').innerHTML = '<div class="report-loading" style="color:#f44336"><i class="fas fa-exclamation-triangle"></i> Erro ao carregar relatório.</div>';
+                console.error('Erro loadReport:', err);
+            }
         }
 
         function logout() {
