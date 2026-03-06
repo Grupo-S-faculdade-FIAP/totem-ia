@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 # Importar agents e prompts
 # from prompts.agents_config import get_agent
 
-from src.modules.image import ImageClassifier, SAT_LOW_THRESHOLD, SAT_VERY_LOW_THRESHOLD
+from src.modules.image import ImageClassifier
 from src.modules.sprint3_analytics import build_analytics_report, build_daily_trend, is_admin_authenticated
 
 from src.hardware.esp32 import ESP32_API_URL, get_esp32_sensors, calculate_environmental_impact, check_esp32_mechanical, confirm_esp32_detection
@@ -432,12 +432,20 @@ def api_validate_complete():
             }), 500
 
         is_tampinha = pred == 1
-        borderline_low_sat = (
-            not is_tampinha
-            and sat is not None
-            and SAT_VERY_LOW_THRESHOLD <= float(sat) < SAT_LOW_THRESHOLD
-        )
-        if not is_tampinha and not borderline_low_sat:
+
+        # Métricas CV para debug (visíveis no console do browser)
+        cv_debug = {
+            'hough': classifier._last_hough_count if classifier else 0,
+            'hough_consistent': classifier._last_hough_consistent if classifier else False,
+            'circularity': round(classifier._last_circularity, 3) if classifier else 0,
+            'aspect_ratio': round(classifier._last_aspect_ratio, 3) if classifier else 0,
+            'ellipse_aspect': round(classifier._last_ellipse_aspect, 3) if classifier else 0,
+            'contour_area': round(classifier._last_contour_area, 1) if classifier else 0,
+        }
+        logger.info(f"🔬 CV Debug: {cv_debug}")
+
+        # Rejeitar sempre que pred=0 (CV ou SVM rejeitou). Não há bypass por saturação.
+        if not is_tampinha:
             if db_connection:
                 with db_connection as db:
                     db.save_interaction(DatabaseConnection.ResultadoInteracao.REJEITADO)
@@ -454,14 +462,9 @@ def api_validate_complete():
                 'confidence': float(conf) if conf is not None else None,
                 'saturation': float(sat) if sat is not None else None,
                 'method': method,
+                'cv_debug': cv_debug,
                 'timestamp': datetime.now().isoformat()
             }), 200
-
-        if borderline_low_sat:
-            logger.warning(
-                "⚠️ Classificação limítrofe em baixa saturação; prosseguindo para validação mecânica "
-                f"(sat={sat:.1f}, conf={conf:.2f})"
-            )
 
         logger.info(f"✅ Classificação OK: TAMPINHA (conf: {conf:.2f})")
 
@@ -475,11 +478,8 @@ def api_validate_complete():
                     'is_tampinha': True,
                     'confidence': float(conf) if conf is not None else None,
                     'saturation': float(sat) if sat is not None else None,
-                    'method': method
-                },
-                'mecanica': {
-                    'status': 'pendente',
-                    'message': 'Validando ESP32 em background...'
+                    'method': method,
+                    'cv_debug': cv_debug,
                 }
             },
             'timestamp': datetime.now().isoformat()

@@ -3,7 +3,7 @@ Testes unitários dos artefatos de modelo (.pkl) usados em produção.
 
 Garante que:
 - modelo e scaler existem e carregam corretamente;
-- ambos estão alinhados ao vetor de 8 features da inferência;
+- ambos estão alinhados ao vetor de 8 ou 332 features da inferência;
 - pipeline scaler -> model funciona em predição e decision_function;
 - ImageClassifier consegue carregar e inferir usando os .pkl reais.
 """
@@ -38,20 +38,23 @@ class TestModelArtifacts:
         assert MODEL_PATH.exists(), f"Modelo não encontrado: {MODEL_PATH}"
         assert SCALER_PATH.exists(), f"Scaler não encontrado: {SCALER_PATH}"
 
-    def test_artifacts_are_trained_for_12_features(self):
-        """Modelo e scaler de produção devem estar treinados com 12 features."""
+    def test_artifacts_are_trained_for_expected_features(self):
+        """Modelo e scaler devem estar treinados com 8 (legacy) ou 332 (8+HOG) features."""
         model = joblib.load(MODEL_PATH)
         scaler = joblib.load(SCALER_PATH)
 
-        assert getattr(model, "n_features_in_", None) == 12
-        assert getattr(scaler, "n_features_in_", None) == 12
+        n_model = getattr(model, "n_features_in_", None)
+        n_scaler = getattr(scaler, "n_features_in_", None)
+        assert n_model in (8, 332), f"Modelo espera 8 ou 332 features, obteve {n_model}"
+        assert n_scaler == n_model, f"Scaler e modelo devem ter mesmo n_features: {n_scaler} vs {n_model}"
 
     def test_scaler_and_model_pipeline_smoke(self):
-        """Pipeline scaler -> model deve processar vetor (1, 12) sem erro."""
+        """Pipeline scaler -> model deve processar vetor sem erro."""
         model = joblib.load(MODEL_PATH)
         scaler = joblib.load(SCALER_PATH)
 
-        x = np.zeros((1, 12), dtype=np.float64)
+        n = getattr(model, "n_features_in_", 8)
+        x = np.zeros((1, n), dtype=np.float64)
         x_scaled = scaler.transform(x)
         pred = model.predict(x_scaled)
         decision = model.decision_function(x_scaled)
@@ -81,4 +84,8 @@ class TestModelArtifacts:
             "NORMAL_SAT_TAMPINHA",
             "DEBUG_MODE",
             "ERRO",
-        }
+            "CV_CIRCLE_CONFIRMED",
+            "SVM_ACCEPT",
+            "CV_NO_CIRCLE",
+            "FACE_DETECTED",
+        } or method.startswith("CV_REJECT")

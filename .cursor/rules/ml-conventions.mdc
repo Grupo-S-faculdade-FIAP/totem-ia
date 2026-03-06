@@ -6,12 +6,11 @@ alwaysApply: true
 
 # 🤖 ML Conventions — TOTEM IA
 
-> **Atenção**: Existem dois extratores de features no projeto com vetores **diferentes**:
-> - `src/models_trainers/svm_complete_classifier.py` → **24 features** (RGB+HSV+Shape) — treinamento offline legado (não usar para produção)
-> - `src/modules/image.py` + `src/models_trainers/svm_8features_trainer.py` → **12 features** (BGR-B, BGR-G, HSV-sat, contraste, edge+forma) — produção
+> **Atenção**: Existem extratores de features com vetores **diferentes**:
+> - `src/models_trainers/svm_complete_classifier.py` → **24 features** (RGB+HSV+Shape) — legado (não usar para produção)
+> - `src/modules/image.py` + `src/models_trainers/svm_8features_trainer.py` → **8 features** (legacy) ou **332 features** (8 cor + HOG) — produção
 >
-> O modelo `.pkl` em uso **deve** ter sido treinado com o mesmo vetor de produção (12 features via `svm_8features_trainer.py`).
-> Nunca usar o trainer de 24 features para gerar o modelo que vai para `models/svm/svm_model_complete.pkl`.
+> O modelo `.pkl` em uso pode ser **8 features** (BGR+HSV+contraste) ou **332 features** (8 cor + HOG). O `extract_color_features` detecta automaticamente via `scaler.n_features_in_`.
 
 ## 1. Compatibilidade Python 3.9
 
@@ -28,31 +27,26 @@ import numpy as np
 
 ---
 
-## 2. Contrato do Vetor de Features (12 dimensões — NÃO alterar sem retreinar)
+## 2. Contrato do Vetor de Features (8 ou 332 dimensões)
 
-O modelo SVM treinado espera **exatamente 12 features** nesta ordem:
+O modelo SVM pode esperar **8 features** (legacy) ou **332 features** (8 cor + HOG):
 
-| Índice | Feature                    | Canal/Fonte        |
-|--------|----------------------------|--------------------|
-| 0      | Mean canal B               | BGR                |
-| 1      | Std canal B                | BGR                |
-| 2      | Median canal B             | BGR                |
-| 3      | Mean canal G               | BGR                |
-| 4      | Std canal G                | BGR                |
-| 5      | Median canal G             | BGR                |
-| **6**  | **Saturação média**        | **HSV**            |
-| 7      | Contraste geral            | Grayscale          |
-| 8      | Edge density (Canny ratio) | Grayscale + Canny  |
-| 9      | Contour count              | Canny + findContours|
-| 10     | Largest circularity        | Maior contorno     |
-| 11     | Largest area ratio         | Maior contorno     |
+### 8 features (legacy)
+| Índice | Feature           | Canal/Fonte |
+|--------|-------------------|-------------|
+| 0-2    | Mean, Std, Median B | BGR       |
+| 3-5    | Mean, Std, Median G | BGR       |
+| **6**  | **Saturação média** | HSV       |
+| 7      | Contraste geral     | Grayscale |
+
+### 332 features (8 cor + HOG)
+- Índices 0-7: idênticos ao legacy
+- Índices 8-331: HOG (skimage) em grayscale 64×64, orientations=9, pixels_per_cell=(16,16), cells_per_block=(2,2)
 
 ### Regras críticas
-- **Nunca** adicionar ou remover features sem gerar novo `.pkl` treinado com o mesmo vetor
-- **`features[6]` é a saturação** — código que precisar de saturação lê esse índice, não recalcula HSV
-- **`features[8]`** = `edge_pixels / (128*128)` via `cv2.Canny(gray, 50, 150)` — tampinhas têm borda circular densa
-- **`features[10]`** = `4π·area / perimeter²` (1.0 = círculo perfeito) — feature mais discriminativa para tampinha
-- Validar sempre com `assert features.shape == (12,)` em testes
+- **`features[6]` é a saturação** — código que precisar de saturação lê esse índice
+- **Nunca** alterar features sem retreinar e gerar novo `.pkl`
+- Validar com `assert features.shape[0] in (8, 332)` em testes
 
 ```python
 # ✅ Correto: ler saturação do vetor já calculado
@@ -118,6 +112,10 @@ def classify_image(
 | `"LOW_SAT_FORCE_TAMPINHA"`| `SAT_VERY_LOW ≤ sat < SAT_LOW`              |
 | `"DEBUG_MODE"`            | `is_debug_mode=True` e `sat > SAT_DEBUG_MIN` |
 | `"ERRO"`                  | qualquer falha interna                       |
+| `"FACE_DETECTED"`         | Haar cascade detectou rosto → rejeitar       |
+| `"CV_CIRCLE_CONFIRMED"`   | CV confirma círculo (Hough+contorno)        |
+| `"SVM_ACCEPT"`            | SVM aceita (conf > threshold)               |
+| `"CV_NO_CIRCLE"`          | CV não confirmou, SVM rejeitou              |
 
 **Nunca inventar novos métodos sem documentar nesta tabela.**
 

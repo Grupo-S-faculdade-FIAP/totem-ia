@@ -8,7 +8,7 @@ Cobre:
 import pytest
 import numpy as np
 import cv2
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 from src.modules.image import ImageClassifier
@@ -17,6 +17,22 @@ from src.modules.image import ImageClassifier
 # =============================================================================
 # HELPERS
 # =============================================================================
+
+def _inject_cv_circle_metrics(clf: ImageClassifier, saturation: int = 150) -> None:
+    """Injeta métricas CV de círculo perfeito (para testes de aceitação)."""
+    features_8 = np.array([100.0, 20.0, 100.0, 100.0, 20.0, 100.0, float(saturation), 30.0])
+
+    def mock_extract(image: np.ndarray) -> np.ndarray:
+        clf._last_hough_count = 1
+        clf._last_contour_count = 1.0
+        clf._last_circularity = 0.95
+        clf._last_aspect_ratio = 0.95
+        clf._last_ellipse_aspect = 0.95
+        clf._last_contour_area = 500.0
+        clf._last_hough_consistent = True
+        return features_8
+
+    clf.extract_color_features = mock_extract  # type: ignore[method-assign]
 
 def create_image_with_saturation(saturation: int, size: int = 128) -> np.ndarray:
     """Cria imagem BGR 128x128 com saturação HSV exata (0-255)."""
@@ -27,19 +43,42 @@ def create_image_with_saturation(saturation: int, size: int = 128) -> np.ndarray
     return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
 
+def create_circle_image(radius: int = 40, canvas: int = 128) -> np.ndarray:
+    """Círculo colorido — CV confirma forma circular (para testes de aceitação)."""
+    img = np.zeros((canvas, canvas, 3), dtype=np.uint8)
+    center = (canvas // 2, canvas // 2)
+    cv2.circle(img, center, radius, (50, 180, 50), -1)
+    cv2.circle(img, center, radius, (30, 200, 30), 2)
+    return img
+
+
 # =============================================================================
 # FIXTURES
 # =============================================================================
 
 @pytest.fixture
 def classifier() -> ImageClassifier:
-    """Classificador com modelo SVM mockado."""
+    """Classificador com modelo SVM mockado (aceita)."""
     clf = ImageClassifier()
     clf.model = MagicMock()
     clf.scaler = MagicMock()
     clf.model.predict.return_value = [1]
     clf.model.decision_function.return_value = [2.5]
-    clf.scaler.transform.return_value = np.array([[0.5] * 8])
+    n_feat = 332  # 8 cor + HOG (ou 8 se modelo legado)
+    clf.scaler.transform.return_value = np.array([[0.5] * n_feat])
+    return clf
+
+
+@pytest.fixture
+def classifier_reject() -> ImageClassifier:
+    """Classificador com SVM mockado para rejeitar (pred=0)."""
+    clf = ImageClassifier()
+    clf.model = MagicMock()
+    clf.scaler = MagicMock()
+    clf.model.predict.return_value = [0]
+    clf.model.decision_function.return_value = [-1.5]
+    n_feat = 332  # 8 cor + HOG (ou 8 se modelo legado)
+    clf.scaler.transform.return_value = np.array([[0.5] * n_feat])
     return clf
 
 
@@ -49,12 +88,12 @@ def classifier() -> ImageClassifier:
 
 class TestExtractColorFeatures:
     def test_retorna_8_features(self):
-        """extract_color_features deve retornar vetor com exatamente 8 valores (para o SVM)."""
+        """extract_color_features deve retornar vetor de 8 (legacy) ou 332 (8+HOG) valores."""
         clf = ImageClassifier()
         image = create_image_with_saturation(100)
         features = clf.extract_color_features(image)
         assert features is not None
-        assert features.shape == (8,)
+        assert features.shape[0] in (8, 332), f"Esperado 8 ou 332 features, obteve {features.shape[0]}"
 
     def test_imagem_invalida_retorna_none(self):
         """Entrada que não é ndarray deve retornar None."""
@@ -139,132 +178,119 @@ class TestClassifyImage:
     # ── SAT_HIGH ──────────────────────────────────────────────────────────
 
     def test_sat_high_retorna_tampinha(self, classifier: ImageClassifier):
-        """Saturação > 120 → TAMPINHA via SAT_HIGH, confiança ≥ 0.90."""
-        image = create_image_with_saturation(180)
+        """CV confirma círculo → TAMPINHA via CV_CIRCLE_CONFIRMED."""
+        _inject_cv_circle_metrics(classifier)
+        image = create_circle_image(radius=50)
         pred, conf, sat, method = classifier.classify_image(image)
         assert pred == 1
-        assert conf is not None and conf >= 0.90
-        assert method == "SAT_HIGH"
+        assert conf is not None and conf >= 0.85
+        assert method == "CV_CIRCLE_CONFIRMED"
 
     def test_sat_high_retorna_saturation_float(self, classifier: ImageClassifier):
         """Saturação retornada deve ser float."""
-        image = create_image_with_saturation(180)
+        _inject_cv_circle_metrics(classifier)
+        image = create_circle_image(radius=50)
         _, _, sat, _ = classifier.classify_image(image)
         assert isinstance(sat, float)
 
-    def test_sat_high_pred_positivo_com_margem_baixa_rejeita(self, classifier: ImageClassifier):
-        """Mesmo com sat alta, margem baixa não deve aceitar tampinha."""
-        classifier.model.predict.return_value = [1]
-        classifier.model.decision_function.return_value = [0.20]
+    def test_sat_high_pred_positivo_com_margem_baixa_rejeita(self, classifier_reject: ImageClassifier):
+        """SVM rejeita → rejeita (CV_NO_CIRCLE)."""
         image = create_image_with_saturation(180)
-        pred, conf, _, method = classifier.classify_image(image)
+        pred, conf, _, method = classifier_reject.classify_image(image)
         assert pred == 0
         assert conf == 0.90
-        assert method == "SAT_HIGH"
+        assert method == "CV_NO_CIRCLE"
 
-    def test_sat_high_com_svm_rejeitando_nao_forca_tampinha(self, classifier: ImageClassifier):
-        """Saturação alta não deve forçar aceitação quando SVM rejeita."""
-        classifier.model.predict.return_value = [0]
+    def test_sat_high_com_svm_rejeitando_nao_forca_tampinha(self, classifier_reject: ImageClassifier):
+        """SVM rejeita → rejeita (CV_NO_CIRCLE)."""
         image = create_image_with_saturation(180)
-        pred, conf, _, method = classifier.classify_image(image)
+        pred, conf, _, method = classifier_reject.classify_image(image)
         assert pred == 0
-        assert conf == 0.90
-        assert method == "SAT_HIGH"
+        assert method == "CV_NO_CIRCLE"
 
-    # ── SAT_VERY_LOW ──────────────────────────────────────────────────────
+    # ── SAT_VERY_LOW / CV_NO_CIRCLE ────────────────────────────────────────
 
-    def test_sat_very_low_retorna_nao_tampinha(self, classifier: ImageClassifier):
-        """Saturação < 30 → NÃO-TAMPINHA via SAT_VERY_LOW, confiança = 0.95."""
+    def test_sat_very_low_retorna_nao_tampinha(self, classifier_reject: ImageClassifier):
+        """SVM rejeita → rejeita (CV_NO_CIRCLE)."""
         image = create_image_with_saturation(5)
-        pred, conf, sat, method = classifier.classify_image(image)
+        pred, conf, sat, method = classifier_reject.classify_image(image)
         assert pred == 0
-        assert conf == 0.95
-        assert method == "SAT_VERY_LOW"
+        assert conf == 0.90
+        assert method == "CV_NO_CIRCLE"
 
-    # ── MID_HIGH_SAT / ACCEPT_MID_SAT ────────────────────────────────────
+    # ── CV_CIRCLE_CONFIRMED (aceitação) / CV_NO_CIRCLE (rejeição) ───────────
 
     def test_mid_high_sat_svm_aceita(self, classifier: ImageClassifier):
-        """100 < sat ≤ 120, SVM pred=1 → MID_HIGH_SAT."""
-        classifier.model.predict.return_value = [1]
-        image = create_image_with_saturation(110)
-        pred, conf, sat, method = classifier.classify_image(image)
-        assert pred == 1
-        assert method == "MID_HIGH_SAT"
-
-    def test_mid_high_sat_svm_rejeita_nao_aceita(self, classifier: ImageClassifier):
-        """100 < sat ≤ 120, SVM pred=0 deve rejeitar para evitar falso positivo."""
-        classifier.model.predict.return_value = [0]
-        image = create_image_with_saturation(110)
-        pred, conf, sat, method = classifier.classify_image(image)
-        assert pred == 0
-        assert method == "ACCEPT_MID_SAT"
-        assert conf == 0.70
-
-    def test_mid_high_sat_pred_positivo_com_margem_baixa_rejeita(self, classifier: ImageClassifier):
-        """Predição positiva com margem baixa deve cair na zona de incerteza (rejeitar)."""
-        classifier.model.predict.return_value = [1]
-        classifier.model.decision_function.return_value = [0.05]
-        image = create_image_with_saturation(110)
+        """CV confirma círculo → TAMPINHA."""
+        _inject_cv_circle_metrics(classifier)
+        image = create_circle_image(radius=50)
         pred, _, _, method = classifier.classify_image(image)
+        assert pred == 1
+        assert method == "CV_CIRCLE_CONFIRMED"
+
+    def test_mid_high_sat_svm_rejeita_nao_aceita(self, classifier_reject: ImageClassifier):
+        """SVM rejeita → rejeita."""
+        image = create_image_with_saturation(110)
+        pred, conf, _, method = classifier_reject.classify_image(image)
         assert pred == 0
-        assert method == "ACCEPT_MID_SAT"
+        assert method == "CV_NO_CIRCLE"
+        assert conf == 0.90
+
+    def test_mid_high_sat_pred_positivo_com_margem_baixa_rejeita(self, classifier_reject: ImageClassifier):
+        """SVM rejeita → rejeita."""
+        image = create_image_with_saturation(110)
+        pred, _, _, method = classifier_reject.classify_image(image)
+        assert pred == 0
+        assert method == "CV_NO_CIRCLE"
 
     def test_mid_high_sat_pred_positivo_com_margem_calibrada_aceita(self, classifier: ImageClassifier):
-        """Predição positiva com margem acima do mínimo calibrado deve aceitar."""
-        classifier.model.predict.return_value = [1]
-        classifier.model.decision_function.return_value = [0.7]
-        image = create_image_with_saturation(110)
+        """CV confirma círculo → TAMPINHA."""
+        _inject_cv_circle_metrics(classifier)
+        image = create_circle_image(radius=50)
         pred, _, _, method = classifier.classify_image(image)
         assert pred == 1
-        assert method == "MID_HIGH_SAT"
-
-    # ── NORMAL_SAT_TAMPINHA ───────────────────────────────────────────────
+        assert method == "CV_CIRCLE_CONFIRMED"
 
     def test_normal_sat_tampinha(self, classifier: ImageClassifier):
-        """50 ≤ sat ≤ 100 → NORMAL_SAT_TAMPINHA, confiança = 0.80."""
-        image = create_image_with_saturation(75)
+        """CV confirma círculo → TAMPINHA."""
+        _inject_cv_circle_metrics(classifier)
+        image = create_circle_image(radius=50)
         pred, conf, sat, method = classifier.classify_image(image)
         assert pred == 1
-        assert conf == 0.80
-        assert method == "NORMAL_SAT_TAMPINHA"
+        assert conf >= 0.85
+        assert method == "CV_CIRCLE_CONFIRMED"
 
-    def test_normal_sat_svm_rejeita(self, classifier: ImageClassifier):
-        """50 ≤ sat ≤ 100 com SVM=0 deve rejeitar."""
-        classifier.model.predict.return_value = [0]
+    def test_normal_sat_svm_rejeita(self, classifier_reject: ImageClassifier):
+        """SVM rejeita → rejeita."""
         image = create_image_with_saturation(75)
-        pred, conf, _, method = classifier.classify_image(image)
+        pred, conf, _, method = classifier_reject.classify_image(image)
         assert pred == 0
-        assert conf == 0.80
-        assert method == "NORMAL_SAT_TAMPINHA"
+        assert conf == 0.90
+        assert method == "CV_NO_CIRCLE"
 
     def test_normal_sat_svm_aceita_com_margem_calibrada(self, classifier: ImageClassifier):
-        """50 ≤ sat ≤ 100 com margem acima do mínimo calibrado deve aceitar."""
-        classifier.model.predict.return_value = [1]
-        classifier.model.decision_function.return_value = [0.8]
-        image = create_image_with_saturation(75)
+        """CV confirma círculo → TAMPINHA."""
+        _inject_cv_circle_metrics(classifier)
+        image = create_circle_image(radius=50)
         pred, _, _, method = classifier.classify_image(image)
         assert pred == 1
-        assert method == "NORMAL_SAT_TAMPINHA"
-
-    # ── LOW_SAT_FORCE_TAMPINHA ────────────────────────────────────────────
+        assert method == "CV_CIRCLE_CONFIRMED"
 
     def test_low_sat_force_tampinha(self, classifier: ImageClassifier):
-        """30 ≤ sat < 50 com SVM=1 e margem alta → LOW_SAT_FORCE_TAMPINHA, confiança = 0.65."""
-        classifier.model.decision_function.return_value = [2.5]  # margem >= 1.2
-        image = create_image_with_saturation(40)
+        """CV confirma círculo → TAMPINHA (mesmo com sat baixa)."""
+        _inject_cv_circle_metrics(classifier, saturation=40)
+        image = create_circle_image(radius=50)
         pred, conf, sat, method = classifier.classify_image(image)
         assert pred == 1
-        assert conf == 0.65
-        assert method == "LOW_SAT_FORCE_TAMPINHA"
+        assert method == "CV_CIRCLE_CONFIRMED"
 
-    def test_low_sat_com_svm_rejeita_nao_forca_aceite(self, classifier: ImageClassifier):
-        """30 ≤ sat < 50 com SVM=0 deve rejeitar com confiança = 0.70."""
-        classifier.model.predict.return_value = [0]
+    def test_low_sat_com_svm_rejeita_nao_forca_aceite(self, classifier_reject: ImageClassifier):
+        """SVM rejeita → rejeita."""
         image = create_image_with_saturation(40)
-        pred, conf, _, method = classifier.classify_image(image)
+        pred, conf, _, method = classifier_reject.classify_image(image)
         assert pred == 0
-        assert conf == 0.70
-        assert method == "LOW_SAT_FORCE_TAMPINHA"
+        assert conf == 0.90
+        assert method == "CV_NO_CIRCLE"
 
     # ── DEBUG_MODE ────────────────────────────────────────────────────────
 
@@ -277,17 +303,17 @@ class TestClassifyImage:
         assert method == "DEBUG_MODE"
 
     def test_debug_mode_nao_ativa_para_sat_muito_baixa(self, classifier: ImageClassifier):
-        """Modo debug com sat < 30 → SAT_VERY_LOW (debug não se aplica antes do check de sat)."""
+        """Modo debug com sat < 30 → rejeita (CV_NO_CIRCLE)."""
         image = create_image_with_saturation(5)
         pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=True)
         assert pred == 0
-        assert method == "SAT_VERY_LOW"
+        assert method == "CV_NO_CIRCLE"
 
-    def test_debug_mode_falso_nao_interfere(self, classifier: ImageClassifier):
-        """is_debug_mode=False deve seguir o fluxo normal."""
+    def test_debug_mode_falso_nao_interfere(self, classifier_reject: ImageClassifier):
+        """is_debug_mode=False, SVM rejeita → CV_NO_CIRCLE."""
         image = create_image_with_saturation(75)
-        pred, conf, sat, method = classifier.classify_image(image, is_debug_mode=False)
-        assert method == "NORMAL_SAT_TAMPINHA"
+        pred, conf, sat, method = classifier_reject.classify_image(image, is_debug_mode=False)
+        assert method == "CV_NO_CIRCLE"
 
 
 class TestImageClassifierErrorPaths:
@@ -354,7 +380,7 @@ class TestImageClassifierErrorPaths:
         features = clf.extract_color_features(image)
 
         assert features is not None
-        assert features.shape == (8,)
+        assert features.shape[0] in (8, 332), f"Esperado 8 ou 332 features, obteve {features.shape[0]}"
 
     def test_extract_features_trata_excecao_interna(self, monkeypatch):
         """Erro interno em cv2.resize deve retornar None."""
@@ -371,7 +397,7 @@ class TestImageClassifierErrorPaths:
         clf = ImageClassifier()
         clf.model = MagicMock()
         clf.scaler = MagicMock()
-        clf.extract_color_features = MagicMock(return_value=np.array([np.nan] * 12))
+        clf.extract_color_features = MagicMock(return_value=np.array([np.nan] * 332))
 
         pred, conf, sat, method = clf.classify_image(create_image_with_saturation(100))
 
@@ -393,3 +419,16 @@ class TestImageClassifierErrorPaths:
         assert conf is None
         assert sat is None
         assert method == "ERRO"
+
+    def test_face_detectada_rejeita_imediatamente(self, classifier: ImageClassifier):
+        """Quando Haar cascade detecta rosto, retorna 0 (não-tampinha) com FACE_DETECTED."""
+        face_cascade = MagicMock()
+        face_cascade.detectMultiScale.return_value = [(10, 10, 80, 80)]  # rosto detectado
+
+        with patch('src.modules.image._get_face_cascade', return_value=face_cascade):
+            image = create_image_with_saturation(150)  # sat alta, SVM tenderia aceitar
+            pred, conf, sat, method = classifier.classify_image(image)
+
+        assert pred == 0
+        assert conf == 0.95
+        assert method == "FACE_DETECTED"

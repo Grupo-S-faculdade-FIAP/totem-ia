@@ -23,6 +23,7 @@ from src.modules.image import (
     ImageClassifier,
     CV_MIN_CIRCULARITY,
     CV_MIN_ASPECT_RATIO,
+    CV_MIN_ELLIPSE_ASPECT,
 )
 
 
@@ -90,19 +91,29 @@ def _make_classifier_with_svm_accept() -> ImageClassifier:
     return clf
 
 
+def _make_classifier_with_svm_reject() -> ImageClassifier:
+    """Classificador com SVM mockado para SEMPRE rejeitar."""
+    clf = ImageClassifier()
+    clf.model = MagicMock()
+    clf.scaler = MagicMock()
+    clf.model.predict.return_value = [0]
+    clf.model.decision_function.return_value = [-2.0]
+    clf.scaler.transform.side_effect = lambda x: np.array(x)
+    return clf
+
+
 def _inject_cv_metrics(
     clf: ImageClassifier,
     hough: int = 0,
     contour_count: float = 0.0,
     circ: float = 0.0,
     aspect: float = 0.0,
+    ellipse_aspect: float = 0.0,
+    contour_area: float = 0.0,
+    hough_consistent: bool = False,
     saturation: int = 150,
 ) -> None:
-    """Substitui extract_color_features por mock que injeta métricas CV controladas.
-
-    Essencial para testar a lógica de decisão CV isoladamente, sem que
-    classify_image sobrescreva os _last_* ao chamar extract_color_features.
-    """
+    """Substitui extract_color_features por mock que injeta métricas CV controladas."""
     features_8 = np.array([100.0, 20.0, 100.0, 100.0, 20.0, 100.0, float(saturation), 30.0])
 
     def mock_extract(image: np.ndarray) -> np.ndarray:
@@ -110,6 +121,9 @@ def _inject_cv_metrics(
         clf._last_contour_count = contour_count
         clf._last_circularity = circ
         clf._last_aspect_ratio = aspect
+        clf._last_ellipse_aspect = ellipse_aspect
+        clf._last_contour_area = contour_area
+        clf._last_hough_consistent = hough_consistent
         return features_8
 
     clf.extract_color_features = mock_extract  # type: ignore[method-assign]
@@ -196,7 +210,8 @@ class TestCvPreScreeningDecision:
         """Se HoughCircles detectar círculo, não deve CV_REJECT e deve chamar SVM."""
         clf = _make_classifier_with_svm_accept()
         img = make_circle_image(radius=48)
-        _inject_cv_metrics(clf, hough=1, contour_count=1, circ=0.90, aspect=0.95, saturation=150)
+        _inject_cv_metrics(clf, hough=1, contour_count=1, circ=0.90, aspect=0.95,
+                           ellipse_aspect=0.95, contour_area=500, hough_consistent=True, saturation=150)
 
         pred, conf, sat, method = clf.classify_image(img)
         assert "CV_REJECT" not in method, (
@@ -224,16 +239,15 @@ class TestCvPreScreeningDecision:
         assert pred == 0
         assert "CV_REJECT" in method
 
-    def test_objeto_sem_contornos_passa_para_svm(self):
-        """Objeto sem contornos detectados deve passar para SVM decidir."""
-        clf = _make_classifier_with_svm_accept()
+    def test_objeto_sem_contornos_rejeitado(self):
+        """SVM rejeita → rejeita (CV_NO_CIRCLE)."""
+        clf = _make_classifier_with_svm_reject()
         img = make_solid_image((100, 180, 80))
         _inject_cv_metrics(clf, hough=0, contour_count=0, circ=0.0, aspect=0.0, saturation=150)
 
         pred, conf, sat, method = clf.classify_image(img)
-        assert "CV_REJECT" not in method, (
-            f"Objeto sem contornos não deve ser rejeitado pelo CV. method={method}"
-        )
+        assert pred == 0
+        assert method == "CV_NO_CIRCLE"
 
     def test_cv_reject_retorna_pred_zero_e_confianca_alta(self):
         """CV_REJECT deve retornar pred=0 com confiança >= 0.85."""
@@ -268,7 +282,8 @@ class TestCvThresholdBoundary:
         clf = _make_classifier_with_svm_accept()
         img = make_circle_image()
         _inject_cv_metrics(clf, hough=0, contour_count=1,
-                           circ=CV_MIN_CIRCULARITY, aspect=CV_MIN_ASPECT_RATIO + 0.1, saturation=150)
+                           circ=CV_MIN_CIRCULARITY, aspect=CV_MIN_ASPECT_RATIO + 0.1,
+                           ellipse_aspect=CV_MIN_ELLIPSE_ASPECT, contour_area=500, saturation=150)
 
         pred, conf, sat, method = clf.classify_image(img)
         assert "CV_REJECT" not in method, (
@@ -291,7 +306,8 @@ class TestCvThresholdBoundary:
         clf = _make_classifier_with_svm_accept()
         img = make_circle_image()
         _inject_cv_metrics(clf, hough=0, contour_count=1,
-                           circ=CV_MIN_CIRCULARITY + 0.1, aspect=CV_MIN_ASPECT_RATIO, saturation=150)
+                           circ=CV_MIN_CIRCULARITY + 0.1, aspect=CV_MIN_ASPECT_RATIO,
+                           ellipse_aspect=CV_MIN_ELLIPSE_ASPECT, contour_area=500, saturation=150)
 
         pred, conf, sat, method = clf.classify_image(img)
         assert "CV_REJECT" not in method
@@ -322,8 +338,8 @@ class TestCvThresholdBoundary:
         """HoughCircles detectado deve APROVAR mesmo com circularity e aspect_ratio baixos."""
         clf = _make_classifier_with_svm_accept()
         img = make_circle_image()
-        _inject_cv_metrics(clf, hough=1, contour_count=1,
-                           circ=0.30, aspect=0.30, saturation=150)
+        _inject_cv_metrics(clf, hough=1, contour_count=0,
+                           circ=0.30, aspect=0.30, hough_consistent=True, saturation=150)
 
         pred, conf, sat, method = clf.classify_image(img)
         assert "CV_REJECT" not in method, (
