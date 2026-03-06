@@ -111,7 +111,7 @@ def hybrid_classify_v2(image_path, model, scaler, sat_threshold=120):
     svm_conf = model.decision_function(features_scaled)[0]
     svm_prob = 1 / (1 + np.exp(-svm_conf))
 
-    if saturation > sat_threshold:
+    if saturation > SAT_HIGH_THRESHOLD:
         confidence = 0.95 if svm_pred == 1 else 0.90
         return 1, confidence, saturation, "SAT_HIGH"
     elif saturation < SAT_VERY_LOW_THRESHOLD:

@@ -127,8 +127,8 @@ plantuml totem_ia_diagram.puml
 
 1. **Captura**: Usuário interage com touchscreen
 2. **Aquisição**: Câmera captura imagem da tampinha
-3. **Processamento**: OpenCV extrai features da imagem
-4. **Classificação**: Modelo SVM classifica (tampinha vs não-tampinha)
+3. **Processamento**: ROI central (75%) → resize 128×128 → extração de features (8 cor + HOG)
+4. **Classificação**: Modelo SVM classifica (tampinha vs não-tampinha) com pré-filtro CV (circularidade, Hough)
 5. **Feedback**: Interface mostra resultado + impacto ambiental
 6. **Armazenamento**: Dados salvos localmente e enviados para nuvem
 
@@ -143,7 +143,7 @@ plantuml totem_ia_diagram.puml
 - **Áudio**: Alto-falantes integrados
 
 #### Software
-- **Backend**: Python 3.12 + Flask
+- **Backend**: Python 3.9+ + Flask
 - **Visão Computacional**: OpenCV 4.8+
 - **Machine Learning**: Scikit-learn (SVM)
 - **Frontend**: HTML5 + CSS3 + JavaScript
@@ -153,9 +153,10 @@ plantuml totem_ia_diagram.puml
 
 #### Inteligência Artificial
 - **Modelo**: Support Vector Machine (SVM) com kernel RBF
-- **Features**: 24 características (cores, texturas, formas)
-- **Dataset**: 4.430 imagens (2.215 tampinhas + 2.215 não-tampinhas)
-- **Acurácia**: 100% em treino e validação
+- **Features**: 332 dimensões (8 cor BGR+HSV+contraste + 324 HOG para forma)
+- **Dataset**: `datasets/` — field-real, color-cap, non-cap (positivos e negativos)
+- **Treinamento**: `src/models_trainers/svm_8features_trainer.py`
+- **Métricas**: Precision ~99%, Recall ~98%, CV accuracy ~98%
 
 #### Serviços em Nuvem
 - **Hosting**: Render (Python web service)
@@ -277,7 +278,7 @@ O sistema implementa integração bidirecional com API ESP32 para validação me
 ```
 User (Browser)
      ↓
-TOTEM IA (Local - Port 8000)
+TOTEM IA (Local - Port 5003)
      ↓
 Loading Screen (3 etapas com animações)
      ↓
@@ -545,8 +546,9 @@ python app.py
 
 # Terminal 2: TOTEM IA
 cd totem-ia
+source venv/bin/activate  # ou venv\Scripts\activate no Windows
 python app.py
-# http://localhost:8000
+# http://localhost:5003
 ```
 
 #### Remote (Render)
@@ -566,8 +568,13 @@ https://totem-ia.onrender.com
 
 ### Pré-requisitos
 ```bash
-# Python 3.13+
-python --version
+# Python 3.9+
+python3 --version
+
+# Ambiente virtual
+python3 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# ou: venv\Scripts\activate  # Windows
 
 # Instalar dependências
 pip install -r requirements.txt
@@ -575,13 +582,13 @@ pip install -r requirements.txt
 
 ### Execução Local
 ```bash
-# Treinar modelo (opcional)
-python src/models_trainers/svm_complete_classifier.py
+# Treinar modelo (opcional — usa dados em datasets/)
+python src/models_trainers/svm_8features_trainer.py
 
 # Iniciar servidor
 python app.py
 
-# Acessar: http://localhost:8000
+# Acessar: http://localhost:5003
 ```
 
 ### Deployment
@@ -596,35 +603,34 @@ git push origin main
 
 ### Testes
 ```bash
-# Classificação simples
-curl -X POST -F "file=@tampinha.jpg" http://localhost:8000/api/classify
+# Rodar suíte de testes
+pytest tests/ -v
 
-# Validação completa (com ESP32)
-curl -X POST -F "file=@tampinha.jpg" http://localhost:8000/api/validate-complete
+# Testes do classificador e modelo
+pytest tests/test_classify.py tests/test_model_artifacts.py tests/test_svm_8features_trainer.py -v
 
-# Health check
-curl http://localhost:8000/api/health
-
-# Health check ESP32
-curl http://localhost:8000/api/esp32-health
+# Exemplos de API (servidor rodando em localhost:5003)
+curl -X POST -F "file=@tampinha.jpg" http://localhost:5003/api/classify
+curl -X POST -F "file=@tampinha.jpg" http://localhost:5003/api/validate-complete
+curl http://localhost:5003/api/health
+curl http://localhost:5003/api/esp32-health
 ```
 
 ---
 
 ## 📈 Métricas e Resultados
 
-### Performance do Modelo
-- **Acurácia**: 100% (treino) / 100% (validação)
-- **Precisão**: 1.0
-- **Recall**: 1.0
-- **F1-Score**: 1.0
+### Performance do Modelo (SVM 8+HOG)
+- **Precision (tampinha)**: ~99,4%
+- **Recall (tampinha)**: ~98,3%
+- **Accuracy (holdout)**: ~98,2%
+- **CV accuracy**: ~98,4% ± 0,5%
 
 ### Dataset
-- **Total de imagens**: 4.430
-- **Tampinhas**: 2.215 (50%)
-- **Não-tampinhas**: 2.215 (50%)
-- **Validação**: 200 imagens
-- **Fonte**: Dataset customizado + fotos adicionais dos usuários
+- **Estrutura**: `datasets/field-real/`, `datasets/color-cap/`, `datasets/non-cap/`
+- **Positivos**: field-real/positive, color-cap/train|valid/images, src/tampinhas
+- **Negativos**: field-real/negative, non-cap/train|valid/images
+- **Treinamento**: `python src/models_trainers/svm_8features_trainer.py`
 
 ### Impacto Sustentável
 - **Por tampinha**: ~0.5g de plástico reciclado
@@ -638,22 +644,25 @@ curl http://localhost:8000/api/esp32-health
 ### Estrutura Principal
 ```
 totem-ia/
-├── app.py                 # Aplicação Flask principal
-├── totem_ia_diagram.puml  # Diagrama de arquitetura PlantUML
-├── requirements.txt       # Dependências Python
-├── README.md             # Documentação completa
-├── start_totem.py        # Script de inicialização
-├── test_api.py           # Testes da API
-├── test_upload_api.py    # Testes de upload
-├── datasets/             # Conjunto de dados
-├── src/                  # Código fonte
-└── templates/            # Templates HTML
+├── app.py                          # Aplicação Flask principal (porta 5003)
+├── requirements.txt                # Dependências Python
+├── README.md                       # Documentação completa
+├── datasets/                       # Dados para treino (field-real, color-cap, non-cap)
+├── models/svm/                      # Modelo e scaler (.pkl)
+├── src/
+│   ├── modules/image.py            # ImageClassifier (classificação)
+│   ├── database/db.py              # Persistência SQLite
+│   ├── hardware/esp32.py           # Integração ESP32
+│   └── models_trainers/
+│       └── svm_8features_trainer.py # Treinamento SVM (8 cor + HOG)
+├── tests/                           # Testes pytest (261+)
+└── templates/                       # Templates HTML
 ```
 
 ### Arquivos Importantes
-- **`totem_ia_diagram.puml`**: Diagrama completo da arquitetura em PlantUML
 - **`app.py`**: API Flask com endpoints de classificação e interface web
-- **`svm_complete_classifier.py`**: Treinamento do modelo SVM
+- **`src/models_trainers/svm_8features_trainer.py`**: Treinamento do modelo SVM (8 cor + HOG)
+- **`src/modules/image.py`**: Classificador de imagens em produção
 - **`README.md`**: Documentação técnica e de uso
 
 ---
@@ -680,10 +689,9 @@ Este projeto é parte do Challenge FlexMedia - FIAP. Todos os direitos reservado
 ## 🛠️ Ferramentas de Desenvolvimento
 
 ### Ambiente de Desenvolvimento
-- **Editor**: Visual Studio Code
+- **Editor**: Visual Studio Code / Cursor
 - **Versionamento**: Git + GitHub
-- **Diagramas**: PlantUML (instalado via Homebrew)
-- **Python**: 3.12 (compatível com Render)
+- **Python**: 3.9+ (compatível com Render)
 - **Virtual Environment**: venv
 
 ### Extensões VS Code Recomendadas
@@ -697,14 +705,14 @@ Este projeto é parte do Challenge FlexMedia - FIAP. Todos os direitos reservado
 # Instalar dependências
 pip install -r requirements.txt
 
-# Executar aplicação
+# Executar aplicação (porta 5003)
 python app.py
 
-# Gerar diagrama PlantUML
-plantuml totem_ia_diagram.puml
+# Treinar modelo SVM
+python src/models_trainers/svm_8features_trainer.py
 
-# Validar sintaxe PlantUML
-plantuml -checkonly totem_ia_diagram.puml
+# Rodar testes
+pytest tests/ -v
 ```
 
 ---
